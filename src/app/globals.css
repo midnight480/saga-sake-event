@@ -1,0 +1,184 @@
+@import 'tailwindcss';
+
+/* ───────────────────────────────────────────────────────────────
+   デザイントークン
+   claude.ai/design の「佐賀 蔵めぐり アプリ」から取り出した値。
+   色・字・角丸をここだけで管理する。個別の画面に生の #hex を書かない。
+   ─────────────────────────────────────────────────────────────── */
+@theme {
+  /* 背景 ── 奥から手前へ 3 段 */
+  --color-sumi: #101a14; /* ページ地。いちばん奥 */
+  --color-surface: #16221b; /* 画面の地 */
+  --color-card: #1f3128; /* カード・入力欄 */
+  --color-well: #0f1913; /* カメラ枠などのくぼみ */
+
+  /* 文字 */
+  --color-ink: #f3efe4; /* 本文 */
+
+  /* 差し色 */
+  --color-gold: #c8a761; /* 見出しラベル・強調 */
+  --color-gold-bright: #e0c079; /* ホバー / 選択中 */
+  --color-terracotta: #c0563f; /* 主要ボタン・危険 */
+  --color-terracotta-hover: #d06a51;
+  --color-terracotta-soft: #e08a72; /* 警告の文字 */
+  --color-amber: #e8a95a; /* 注意・準備中 */
+  --color-matcha: #8fce89; /* 正常・完了 */
+  --color-forest: #3c4f44; /* 抑えたボタン */
+
+  /* 書体 */
+  --font-display: 'Kaisei HarunoUmi', 'Hiragino Mincho ProN', serif;
+  --font-sans: 'BIZ UDPGothic', system-ui, sans-serif;
+
+  /* 角丸 */
+  --radius-field: 10px;
+  --radius-card: 12px;
+  --radius-screen: 16px;
+}
+
+/* 半透明の境界線・淡い文字。rgba なのでトークン化して使い回す */
+@theme {
+  --color-hairline: rgb(243 239 228 / 0.1);
+  --color-hairline-strong: rgb(243 239 228 / 0.18);
+  --color-ink-70: rgb(243 239 228 / 0.7);
+  --color-ink-55: rgb(243 239 228 / 0.55);
+  --color-ink-45: rgb(243 239 228 / 0.45);
+}
+
+/* ─── 素の要素 ─── */
+html {
+  background: var(--color-sumi);
+  /* iOS Safari のプルダウン跳ね返りで白が見えるのを防ぐ */
+  background-color: var(--color-sumi);
+  color-scheme: dark;
+}
+
+body {
+  margin: 0;
+  background: var(--color-sumi);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  /* iOS で長押し選択・ダブルタップ拡大が誤作動しないように */
+  -webkit-text-size-adjust: 100%;
+  overscroll-behavior-y: none;
+}
+
+/* iOS Safari は 16px 未満の input でフォーカス時に自動ズームする。
+   これがイベント当日の「勝手に画面が拡大した」の原因なので全面的に禁止。 */
+input,
+select,
+textarea,
+button {
+  font-family: inherit;
+  font-size: 16px;
+}
+
+a {
+  color: var(--color-gold);
+}
+a:hover {
+  color: var(--color-gold-bright);
+}
+
+/* ページ地の縦罫（モックアップの 46px ピッチ） */
+.washi {
+  background-image: repeating-linear-gradient(
+    90deg,
+    rgb(243 239 228 / 0.028) 0 1px,
+    transparent 1px 46px
+  );
+}
+
+/* ─── 動き ─── */
+@keyframes pulseDot {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+@keyframes riseIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.pulse-dot {
+  animation: pulseDot 2s infinite;
+}
+.rise-in {
+  animation: riseIn 0.3s ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pulse-dot,
+  .rise-in {
+    animation: none;
+  }
+}
+
+/* ─── 精米歩合スライダー ─── */
+input[type='range'].kura {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 34px;
+  background: transparent;
+  margin: 0;
+}
+input[type='range'].kura::-webkit-slider-runnable-track {
+  height: 10px;
+  border-radius: 6px;
+  background: linear-gradient(
+    90deg,
+    var(--color-gold) var(--p, 60%),
+    rgb(243 239 228 / 0.14) var(--p, 60%)
+  );
+}
+input[type='range'].kura::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 34px;
+  height: 34px;
+  margin-top: -12px;
+  border-radius: 50%;
+  background: var(--color-ink);
+  border: 3px solid var(--color-gold);
+  box-shadow: 0 2px 6px rgb(0 0 0 / 0.4);
+  cursor: pointer;
+}
+input[type='range'].kura::-moz-range-track {
+  height: 10px;
+  border-radius: 6px;
+  background: rgb(243 239 228 / 0.14);
+}
+input[type='range'].kura::-moz-range-progress {
+  height: 10px;
+  border-radius: 6px;
+  background: var(--color-gold);
+}
+input[type='range'].kura::-moz-range-thumb {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--color-ink);
+  border: 3px solid var(--color-gold);
+  cursor: pointer;
+}
+
+/* ─── 印刷（チケット QR 台紙） ─── */
+@media print {
+  html,
+  body {
+    background: #fff !important;
+    color: #000 !important;
+  }
+  .no-print {
+    display: none !important;
+  }
+}

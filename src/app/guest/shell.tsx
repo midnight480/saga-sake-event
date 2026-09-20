@@ -1,0 +1,27 @@
+'use client';
+
+import { AppShell, type Tab } from '@/components/AppShell';
+import { useSnapshot } from '@/lib/useSnapshot';
+
+const TABS: Tab[] = [
+  { href: '/guest', label: 'マイページ', icon: '◉' },
+  { href: '/guest/breweries', label: '酒蔵をさがす', icon: '☷' },
+  { href: '/guest/charge', label: 'チケット', icon: '＋' },
+];
+
+export function GuestShell({ children }: { children: React.ReactNode }) {
+  const { snapshot, isStale } = useSnapshot();
+
+  return (
+    <AppShell
+      role="参加者"
+      roleEn="GUEST"
+      subject={snapshot?.guest?.displayNo}
+      phase={snapshot?.event.phase}
+      tabs={TABS}
+      stale={isStale}
+    >
+      {children}
+    </AppShell>
+  );
+}
