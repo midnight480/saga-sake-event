@@ -1,0 +1,67 @@
+name: CI
+
+# ビルドは型エラーで落とさない設定にしている（主催者が当日デプロイできなくなる方が
+# 危険なため）。そのぶん、型の検査はここで必ず行う。
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: 型検査
+        run: npm run typecheck
+
+      # 環境変数が無い状態でビルドが通ることは、この製品の前提条件。
+      # 主催者は「先にデプロイ → あとから Neon と Clerk を追加」という順で進める。
+      # ここが壊れると、案内すべき /setup すら開けなくなる。
+      - name: 環境変数なしでビルドできること
+        run: npm run build
+        env:
+          DATABASE_URL: ''
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ''
+          CLERK_SECRET_KEY: ''
+
+  sql:
+    runs-on: ubuntu-latest
+    # ensureSchema の SQL を本物の Postgres に 2 回流し、
+    # 構文と冪等性（何度流しても同じ結果になること）を確かめる。
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: saga
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: スキーマを 2 回適用する
+        run: node scripts/check-schema.mjs
+        env:
+          PGHOST: localhost
+          PGPORT: '5432'
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: saga
