@@ -29,21 +29,41 @@ export interface RehearsalBrewery {
   paused?: boolean;
 }
 
+/**
+ * 本数は少なめにしてある。予行演習のあとに蔵の画面で本数を減らして試すとき、
+ * ＋／− を何十回も押さずに済むように。
+ *
+ * わざと売り切れた銘柄を混ぜている。売り切れには 2 通りあり、両方を入れる。
+ * - 出し切った: 持ち込んだ分を全部注いだ（poured が総杯数と同じ）
+ * - 注文で埋まった: 瓶には残っているが、受けた注文が全部押さえている。
+ *   参加者には「完売」と出るが、蔵の画面ではまだ残りがある
+ * あと 1 杯で売り切れる銘柄も 1 つ置く。1 回頼むだけで「完売」に変わるところを
+ * 確かめられる。
+ *
+ * 各行の「残り」は、総杯数（本数 × 1 本の杯数）− poured − 下の注文の未受取分。
+ * 四合瓶は 6 杯、一升瓶は 15 杯。
+ */
 export const REHEARSAL_BREWERIES: RehearsalBrewery[] = [
   {
     name: '天山酒造',
     items: [
-      { name: '七田 純米', kind: '純米', polish: 65, size: '四合瓶', ticketCost: 2, bottles: 24, poured: 96 },
-      { name: '天山 特別純米', kind: '特別純米', polish: 60, size: '一升瓶', ticketCost: 2, bottles: 6, poured: 34 },
-      { name: '七田 純米大吟醸', kind: '純米大吟醸', polish: 45, size: '四合瓶', ticketCost: 4, bottles: 10, poured: 12 },
+      // 12 杯 − 12 = 残り 0 ← 出し切った
+      { name: '七田 純米', kind: '純米', polish: 65, size: '四合瓶', ticketCost: 2, bottles: 2, poured: 12 },
+      // 15 杯 − 9 − 準備完了 2 = 残り 4
+      { name: '天山 特別純米', kind: '特別純米', polish: 60, size: '一升瓶', ticketCost: 2, bottles: 1, poured: 9 },
+      // 6 杯 − 5 − 受付済 1 = 残り 0 ← 注文で埋まった（瓶には 1 杯ある）
+      { name: '七田 純米大吟醸', kind: '純米大吟醸', polish: 45, size: '四合瓶', ticketCost: 4, bottles: 1, poured: 5 },
     ],
   },
   {
     name: '富久千代酒造',
     items: [
-      { name: '鍋島 純米吟醸', kind: '純米吟醸', polish: 55, size: '四合瓶', ticketCost: 3, bottles: 30, poured: 168 },
-      { name: '鍋島 New Moon', kind: '純米大吟醸', polish: 45, size: '四合瓶', ticketCost: 5, bottles: 12, poured: 41 },
-      { name: '鍋島 特別本醸造', kind: '本醸造', polish: 70, size: '一升瓶', ticketCost: 1, bottles: 5, poured: 18 },
+      // 18 杯 − 10 = 残り 8
+      { name: '鍋島 純米吟醸', kind: '純米吟醸', polish: 55, size: '四合瓶', ticketCost: 3, bottles: 3, poured: 10 },
+      // 6 杯 − 4 − 準備中 1 = 残り 1 ← あと 1 杯で売り切れ
+      { name: '鍋島 New Moon', kind: '純米大吟醸', polish: 45, size: '四合瓶', ticketCost: 5, bottles: 1, poured: 4 },
+      // 15 杯 − 11 − 受付済 1 = 残り 3
+      { name: '鍋島 特別本醸造', kind: '本醸造', polish: 70, size: '一升瓶', ticketCost: 1, bottles: 1, poured: 11 },
     ],
   },
   {
@@ -52,9 +72,12 @@ export const REHEARSAL_BREWERIES: RehearsalBrewery[] = [
     // 参加者側の「受付停止中」を確かめるため。
     paused: true,
     items: [
-      { name: '天吹 いちご酵母', kind: '純米吟醸', polish: 55, size: '四合瓶', ticketCost: 3, bottles: 20, poured: 52 },
-      { name: '天吹 純米', kind: '純米', polish: 65, size: '一升瓶', ticketCost: 2, bottles: 4, poured: 12 },
-      { name: '天吹 大吟醸 雄町', kind: '純米大吟醸', polish: 40, size: '四合瓶', ticketCost: 5, bottles: 8, poured: 4 },
+      // 12 杯 − 12 = 残り 0 ← 出し切った
+      { name: '天吹 いちご酵母', kind: '純米吟醸', polish: 55, size: '四合瓶', ticketCost: 3, bottles: 2, poured: 12 },
+      // 15 杯 − 8 − 準備完了 1 = 残り 6
+      { name: '天吹 純米', kind: '純米', polish: 65, size: '一升瓶', ticketCost: 2, bottles: 1, poured: 8 },
+      // 6 杯 − 2 − 準備中 2 = 残り 2
+      { name: '天吹 大吟醸 雄町', kind: '純米大吟醸', polish: 40, size: '四合瓶', ticketCost: 5, bottles: 1, poured: 2 },
     ],
   },
 ];
