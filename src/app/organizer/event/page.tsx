@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useTransition } from 'react';
 
-import { saveEvent, setCupsPerTicket, setPhase, setTicketCount } from '@/app/actions';
+import { saveEvent, setPhase, setTicketCount } from '@/app/actions';
 import {
   Button,
   Card,
@@ -17,7 +17,7 @@ import {
   Title,
   inputClass,
 } from '@/components/ui';
-import { batchForSale, type TicketBatch } from '@/lib/domain';
+import type { TicketBatch } from '@/lib/domain';
 import { useSnapshot } from '@/lib/useSnapshot';
 
 /** STEP 1 ── イベントの日付・時刻・規模を決める。 */
@@ -149,8 +149,8 @@ export default function EventSettingsPage() {
       <SectionLabel>用意するチケット</SectionLabel>
       <div className="flex flex-col gap-3 px-5">
         <Note>
-          券種ごとに「1 枚で何枚分になるか」と「何枚 用意するか」を決めます。
-          ここで決めた枚数の QR が発行され、「チケットQR」の画面から印刷できます。
+          券種ごとに何枚 用意するかを決めます。その枚数の QR が発行され、
+          「チケットQR」の画面から印刷できます。
         </Note>
         {snapshot.batches.map((batch) => (
           <TicketPlan key={batch.id} batch={batch} />
@@ -182,31 +182,34 @@ export default function EventSettingsPage() {
 }
 
 /**
- * 券種ごとの計画。
+ * 券種ごとに「何枚 用意するか」だけを決める。
  *
- * 「あと何枚 足すか」ではなく「何枚 用意するか」を入れてもらう。
- * 主催者が考えているのは総数であって差分ではないので、引き算はこちらでやる。
+ * 入力は「あと何枚 足すか」ではなく総数。主催者が考えているのは
+ * 「前売を 300 枚」であって差分ではないので、引き算はこちらでやる。
+ *
+ * 1 枚が何枚分になるかは、ここでは扱わない。決めることが 2 つあると
+ * どちらを入れる欄か分からなくなるため、「チケットQR」の画面に寄せている。
  */
 function TicketPlan({ batch }: { batch: TicketBatch }) {
   const { refresh } = useSnapshot();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
-  const [saved, setSaved] = useState(false);
-
+  const [done, setDone] = useState<string | null>(null);
   const [target, setTarget] = useState(batch.issued);
-  const [cups, setCups] = useState(batch.cupsPerTicket);
 
-  // 発行してしまうと配った券の価値まで変わるので、1 枚も無いときだけ変えられる。
-  const canChangeCups = batch.issued === 0;
-  const redeemed = batch.redeemed;
+  const changed = target !== batch.issued;
 
-  const act = (fn: () => Promise<{ ok: boolean; reason?: string }>) => {
+  const apply = () => {
     setError(null);
-    setSaved(false);
+    setDone(null);
     startTransition(async () => {
-      const result = await fn();
-      if (result.ok) setSaved(true);
-      else setError(result.reason ?? '変更できませんでした。');
+      const result = await setTicketCount(batch.id, target);
+      if (!result.ok) setError(result.reason);
+      else if (result.value) {
+        const { added, removed } = result.value;
+        if (added > 0) setDone(`${added} 枚 追加しました。`);
+        else if (removed > 0) setDone(`${removed} 枚 減らしました。`);
+      }
       await refresh();
     });
   };
@@ -216,81 +219,34 @@ function TicketPlan({ batch }: { batch: TicketBatch }) {
       <div className="flex items-baseline justify-between gap-2">
         <span className="font-display text-[18px] text-ink">{batch.label}</span>
         <span className="text-[11.5px] leading-none text-ink-55">
-          発行 {batch.issued} 枚 / 読取済 {redeemed} 枚
+          いま {batch.issued} 枚（読取済 {batch.redeemed} 枚）
         </span>
       </div>
 
       {error && <Notice tone="danger">{error}</Notice>}
+      {done && <Notice tone="info">{done}</Notice>}
 
-      <Field
-        label="この券 1 枚で、チケット何枚分にするか"
-        hint={
-          canChangeCups
-            ? '1 杯あたり 1〜3 枚です。10 枚なら、おおよそ 4〜10 杯 楽しめます。'
-            : 'すでに発行した券があるため変更できません。'
-        }
-      >
-        <div className="rounded-field border border-hairline-strong bg-card px-3.5 py-2.5">
-          <Stepper
-            label="チケット枚数"
-            unit="枚分"
-            value={cups}
-            onDecrease={() =>
-              act(async () => {
-                const next = Math.max(1, cups - 1);
-                const r = await setCupsPerTicket(batch.id, next);
-                if (r.ok) setCups(next);
-                return r;
-              })
-            }
-            onIncrease={() =>
-              act(async () => {
-                const next = cups + 1;
-                const r = await setCupsPerTicket(batch.id, next);
-                if (r.ok) setCups(next);
-                return r;
-              })
-            }
-            decreaseDisabled={!canChangeCups || pending || cups <= 1}
-            increaseDisabled={!canChangeCups || pending}
-          />
-        </div>
-      </Field>
-
-      <Field
-        label="何枚 用意するか"
-        hint={`${target} 枚 用意すると、来場者 ${target} 人分・チケット ${target * cups} 枚分になります。`}
-      >
+      <div className="flex items-stretch gap-2">
         <input
           type="number"
-          min={redeemed}
+          inputMode="numeric"
+          min={batch.redeemed}
           max={5000}
           value={target}
           onChange={(e) => setTarget(Math.max(0, Math.min(5000, Number(e.target.value) || 0)))}
-          aria-label={`${batch.label}を何枚用意するか`}
-          className={inputClass}
+          aria-label={`${batch.label}を何枚 用意するか`}
+          className={`${inputClass} flex-1 text-right text-[20px]`}
         />
-      </Field>
+        <span className="flex flex-none items-center text-[13px] text-ink-55">枚</span>
+        <Button tone="go" className="flex-none px-5" onClick={apply} disabled={pending || !changed}>
+          {pending ? '…' : '用意する'}
+        </Button>
+      </div>
 
-      <Button
-        tone="go"
-        block
-        onClick={() => act(() => setTicketCount(batch.id, target))}
-        disabled={pending || target === batch.issued}
-      >
-        {pending
-          ? '用意しています…'
-          : target === batch.issued
-            ? `${batch.issued} 枚 用意できています`
-            : `${target} 枚 にする`}
-      </Button>
-
-      {saved && !error && !pending && (
-        <p className="text-[11.5px] leading-none text-matcha">
-          {batch.issued} 枚 用意できました。「チケットQR」の画面から印刷できます。
-          {batch.issued > 0 && ` （販売できる残り ${batchForSale(batch)} 枚）`}
-        </p>
-      )}
+      <p className="text-[11px] leading-[1.7] text-ink-45">
+        1 枚で チケット {batch.cupsPerTicket} 枚分 ＝ 来場者 {target} 人分。
+        1 枚あたりの枚数は「チケットQR」の画面で変えられます。
+      </p>
     </Card>
   );
 }
