@@ -31,6 +31,21 @@ export interface SetupState {
   ready: boolean;
 }
 
+/**
+ * このサイトの Vercel プロジェクト名。
+ *
+ * 「プロジェクトを開いてください」とだけ書かれても、Vercel の一覧に複数
+ * 並んでいると、どれを開けばよいか分からない。名前が分かるときは案内に
+ * 差し込む。ローカル開発時は分からないので、そのときは一般的な言い方に戻す。
+ */
+function projectName(): string | null {
+  // 例: saga-sake-event.vercel.app -> saga-sake-event
+  const host = process.env.VERCEL_PROJECT_PRODUCTION_URL?.trim();
+  if (!host) return null;
+  const name = host.split('.')[0];
+  return name || null;
+}
+
 export async function getSetupState(): Promise<SetupState> {
   const checks: Check[] = [db(), clerk()];
 
@@ -55,12 +70,14 @@ function db(): Check {
     title: 'データベース（Neon）',
     status: 'todo',
     steps: [
-      'Vercel の画面で、このプロジェクトを開く',
-      '上のメニューから「Storage」を選ぶ',
-      '「Create Database」→「Neon」を選び、無料プラン（Free）のまま進む',
+      `Vercel の画面で、プロジェクト${projectName() ? `「${projectName()}」` : ''}を開く`,
+      // ここは「左のサイドバー」。上を探しても無い（実際にここで詰まった）。
+      '画面の左にならんでいるメニューから「Storage」を押す',
+      '「Create Database」（または「Connect Database」）を押して「Neon」を選ぶ',
+      '無料プラン（Free）のまま進んで作成する',
       '最後に「Connect」を押して、このプロジェクトにつなぐ',
     ],
-    link: { label: 'Vercel の Storage を開く', href: 'https://vercel.com/dashboard/stores' },
+    link: { label: 'Vercel の画面をひらく', href: 'https://vercel.com/dashboard' },
     detail: 'DATABASE_URL / POSTGRES_URL のいずれも設定されていません。',
   };
 }
@@ -79,14 +96,16 @@ function clerk(): Check {
     title: 'ログイン（Clerk）',
     status: 'todo',
     steps: [
-      'Vercel の画面で、このプロジェクトを開く',
-      '上のメニューから「Integrations」を選ぶ',
-      '検索欄に Clerk と入れて、「Install」を押す',
+      `Vercel の画面で、プロジェクト${projectName() ? `「${projectName()}」` : ''}を開く`,
+      // Storage と同じく、こちらも左のサイドバーにある。
+      '画面の左にならんでいるメニューから「Integrations」を押す',
+      '「Browse Marketplace」から Clerk を探して「Install」を押す',
       '無料プラン（Free）のまま進み、このプロジェクトを選ぶ',
       '追加が終わると、鍵は自動で入ります（手で貼る作業はありません）',
+      'そのあと Clerk の画面で「Username」を有効にする（酒蔵のログインに必要）',
     ],
     link: {
-      label: 'Vercel の Integrations を開く',
+      label: 'Clerk を Vercel に追加する',
       href: 'https://vercel.com/marketplace/clerk',
     },
     detail:
