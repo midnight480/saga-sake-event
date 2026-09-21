@@ -14,7 +14,6 @@ import { clerkClient } from '@clerk/nextjs/server';
 
 import { AuthError, requireBrewery, requireOrganizer, requireViewer, syncRoleMetadata } from '@/lib/auth';
 import {
-  INITIAL_TICKETS,
   type BottleSize,
   type EventPhase,
   type GuestKind,
@@ -333,58 +332,6 @@ export async function setRequestStatus(
 // ═════════════════════════════════════════════════════════════
 // 参加者
 // ═════════════════════════════════════════════════════════════
-
-/**
- * 参加区分を決める。
- * 「酒蔵特別枠」は主催者が配る招待コードが要る。合っていれば枠と初期枚数を変える。
- */
-export async function chooseGuestKind(
-  kind: GuestKind,
-  inviteCode?: string,
-): Promise<ActionResult> {
-  return run(async () => {
-    const viewer = await requireViewer();
-    if (viewer.role !== 'guest') {
-      return { ok: false, reason: 'この操作は参加者のみが行えます。' };
-    }
-
-    if (kind === '酒蔵特別枠') {
-      const expected = process.env.BREWERY_GUEST_INVITE_CODE?.trim();
-      if (!expected) {
-        return { ok: false, reason: '酒蔵特別枠はいま受け付けていません。' };
-      }
-      if ((inviteCode ?? '').trim() !== expected) {
-        return { ok: false, reason: '招待コードが違います。主催者に確認してください。' };
-      }
-    }
-
-    const result = await store.setGuestKind(viewer.userId, kind);
-    if (!result.ok) return { ok: false, reason: result.reason };
-
-    // 区分が決まった時点で、その区分の初期枚数を配る（まだ 0 枚のときだけ）。
-    await grantInitialTickets(viewer.userId, kind);
-
-    refresh();
-    return { ok: true };
-  });
-}
-
-/**
- * 初回のチケットを配る。
- * すでに 1 枚でも持っている / 使っている人には配らない（二重配布の防止）。
- */
-async function grantInitialTickets(clerkUserId: string, kind: GuestKind): Promise<void> {
-  const guest = await store.getOrCreateGuest(clerkUserId);
-  if (guest.tickets > 0 || guest.used > 0) return;
-
-  const amount = INITIAL_TICKETS[kind];
-  const { getSql } = await import('@/lib/db');
-  const sql = getSql();
-  await sql`
-    UPDATE guests SET tickets = ${amount}
-    WHERE clerk_user_id = ${clerkUserId} AND tickets = 0 AND used = 0
-  `;
-}
 
 export async function order(itemId: string, cups: number): Promise<ActionResult<{ spent: number }>> {
   return run(async () => {

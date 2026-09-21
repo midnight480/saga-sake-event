@@ -27,7 +27,7 @@ Web サービスです。
 主催を引き受けて、URL や案内を受け取った方はこちらです。
 リポジトリを自分のアカウントに複製してから公開します。
 
-[![Vercel でデプロイ](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fmidnight480%2Fsaga-sake-event&project-name=saga-sake-event&repository-name=saga-sake-event&env=ORGANIZER_EMAILS,BREWERY_GUEST_INVITE_CODE&envDescription=%E4%B8%BB%E5%82%AC%E8%80%85%E3%81%AE%E3%83%A1%E3%83%BC%E3%83%AB%E3%82%A2%E3%83%89%E3%83%AC%E3%82%B9%EF%BC%88%E5%BF%85%E9%A0%88%EF%BC%89%E3%81%A8%E3%80%81%E9%85%92%E8%94%B5%E7%89%B9%E5%88%A5%E6%9E%A0%E3%81%AE%E6%8B%9B%E5%BE%85%E3%82%B3%E3%83%BC%E3%83%89%EF%BC%88%E4%BB%BB%E6%84%8F%EF%BC%89&envLink=https%3A%2F%2Fgithub.com%2Fmidnight480%2Fsaga-sake-event%2Fblob%2Fmain%2Fdocs%2F%25E3%2583%2587%25E3%2583%2597%25E3%2583%25AD%25E3%2582%25A4%25E6%2589%258B%25E9%25A0%2586.md)
+[![Vercel でデプロイ](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fmidnight480%2Fsaga-sake-event&project-name=saga-sake-event&repository-name=saga-sake-event&env=ORGANIZER_EMAILS&envDescription=%E9%81%8B%E5%96%B6%E3%82%92%E6%8B%85%E5%BD%93%E3%81%99%E3%82%8B%E6%96%B9%E3%81%AE%E3%83%A1%E3%83%BC%E3%83%AB%E3%82%A2%E3%83%89%E3%83%AC%E3%82%B9&envLink=https%3A%2F%2Fgithub.com%2Fmidnight480%2Fsaga-sake-event%2Fblob%2Fmain%2Fdocs%2F%25E3%2583%2587%25E3%2583%2597%25E3%2583%25AD%25E3%2582%25A4%25E6%2589%258B%25E9%25A0%2586.md)
 
 1. 上のボタンを押す
 2. GitHub でログイン（無料。持っていなければその場で作れます）
@@ -95,14 +95,13 @@ Vercel の画面で、次の 3 か所が合っているか見てください。
 > `Other` のままなら、リポジトリ名を読み違えていないか確かめてください
 > （例: `saga-event-space` は別のプロジェクトです）。
 
-### Environment Variables ─ 2 つだけ入れてください
+### Environment Variables ─ 1 つだけ入れてください
 
-`Environment Variables` を開くと 5 つの欄が出ます。**うち 2 つだけ入力します。**
+`Environment Variables` を開くと複数の欄が出ます。**入力するのは 1 つだけです。**
 
 | 欄 | どうするか |
 | --- | --- |
 | **`ORGANIZER_EMAILS`** | **ご自身のメールアドレスを入れる**（下記参照） |
-| **`BREWERY_GUEST_INVITE_CODE`** | 「酒蔵特別枠」を使うなら好きな合言葉を入れる（使わないなら空） |
 | `DATABASE_URL` | **空のまま**（あとで Neon が自動で入れます） |
 | `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | **空のまま**（あとで Clerk が自動で入れます） |
 | `CLERK_SECRET_KEY` | **空のまま**（同上） |

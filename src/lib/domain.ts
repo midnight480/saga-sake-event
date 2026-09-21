@@ -29,6 +29,11 @@ export type EventPhase =
   | 'open' // 手動で開けている
   | 'closed'; // 手動で閉じている
 
+/**
+ * 参加区分。
+ * 当日は受付で渡す券の種類でポイントが決まるので、本人が選ぶものではない。
+ * 記録として残しているだけで、いまはすべて「一般参加」になる。
+ */
 export type GuestKind = '一般参加' | '酒蔵特別枠';
 
 /** 瓶のサイズ。1 本から取れる杯数が決まる。 */
@@ -190,12 +195,6 @@ export const BOOTHS = [
   'B-01', 'B-02', 'B-03', 'B-04', 'B-05', 'B-06',
   'C-01', 'C-02', 'C-03', 'C-04', 'C-05', 'C-06',
 ] as const;
-
-/** 参加区分ごとの初期チケット枚数。 */
-export const INITIAL_TICKETS: Record<GuestKind, number> = {
-  一般参加: 10,
-  酒蔵特別枠: 15,
-};
 
 /** 一度に頼める杯数の上限。 */
 export const MAX_CUPS_PER_REQUEST = 3;
