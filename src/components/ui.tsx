@@ -363,7 +363,7 @@ export function StatusBadge({ status }: { status: RequestStatus }) {
 /** 混雑の表示。 */
 export function CrowdBadge({ level, closed }: { level: string; closed?: boolean }) {
   const skin = closed
-    ? 'bg-ink/10 text-ink-55'
+    ? 'bg-amber/25 text-amber'
     : level === '混雑'
       ? 'bg-terracotta/20 text-terracotta-soft'
       : level === 'やや混雑'

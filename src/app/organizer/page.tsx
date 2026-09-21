@@ -148,7 +148,9 @@ function BreweryRow({ brewery, waiting }: { brewery: Brewery; waiting: number })
   const percent = remainingPercent(left, total);
 
   return (
-    <Card>
+    // 受付を止めている蔵は、一覧の中で埋もれさせない。会場では
+    // 「止まっていることに気づかないまま時間が過ぎる」のがいちばん困る。
+    <Card className={brewery.accepting ? undefined : 'border-amber/55 bg-amber/12'}>
       <div className="flex items-center justify-between gap-2.5">
         <div className="flex min-w-0 flex-col gap-0.5">
           <span className="text-[14px] font-bold leading-snug text-ink">{brewery.name}</span>
@@ -158,6 +160,12 @@ function BreweryRow({ brewery, waiting }: { brewery: Brewery; waiting: number })
         </div>
         <CrowdBadge level={crowdLevel(waiting)} closed={!brewery.accepting} />
       </div>
+
+      {!brewery.accepting && (
+        <p className="text-[12px] leading-[1.7] text-amber">
+          この蔵は新しい注文を受け付けていません。蔵の画面から再開できます。
+        </p>
+      )}
 
       <StockBar percent={percent} />
 
