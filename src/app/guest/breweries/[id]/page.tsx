@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { useState, useTransition } from 'react';
 
 import { order } from '@/app/actions';
@@ -119,11 +119,11 @@ function OrderCard({
   blocked: boolean;
   blockedReason: string;
 }) {
+  const router = useRouter();
   const { refresh } = useSnapshot();
   const [cups, setCups] = useState(1);
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
-  const [done, setDone] = useState<string | null>(null);
 
   // 他の人がすでに注文して受け取っていない分を引いた「いま頼める杯数」。
   // ここを物理的な残りにすると、最後の数杯で注文が弾かれる理由が分からなくなる。
@@ -143,16 +143,17 @@ function OrderCard({
 
   const submit = () => {
     setError(null);
-    setDone(null);
     startTransition(async () => {
       const result = await order(item.id, cups);
-      if (result.ok) {
-        setDone('リクエストを送りました。マイページで進み具合が見られます。');
-        setCups(1);
-      } else {
+      if (!result.ok) {
         setError(result.reason);
+        await refresh();
+        return;
       }
+      // 送ったあとに見たいのは、この銘柄ではなく自分の注文の進み具合。
+      // 画面に留めると、間違えてもう一度押してしまうことにもなる。
       await refresh();
+      router.push('/guest');
     });
   };
 
@@ -177,7 +178,6 @@ function OrderCard({
       </div>
 
       {error && <Notice tone="danger">{error}</Notice>}
-      {done && <Notice tone="info">{done}</Notice>}
 
       <div className="flex flex-col gap-2.5 border-t border-hairline pt-3">
         <Stepper
