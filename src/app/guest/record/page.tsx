@@ -1,0 +1,152 @@
+'use client';
+
+import {
+  Card,
+  Empty,
+  Eyebrow,
+  Note,
+  ScreenHeader,
+  SectionLabel,
+  StatusBadge,
+  Title,
+} from '@/components/ui';
+import { conquestOf, formatJstDateTime, requestsOf, type BreweryConquest } from '@/lib/domain';
+import { useSnapshot } from '@/lib/useSnapshot';
+
+/**
+ * 記録。どの蔵・どの銘柄をどれだけ飲んだかと、注文の履歴（Issue #30, #32）。
+ *
+ * マイページにも自分の注文は並んでいるが、あちらは「いま取りに行くべきもの」を
+ * 見るための画面。こちらは振り返るための画面なので、受け取り終えたものや
+ * キャンセルも含めて、時刻つきで全部並べる。
+ */
+export default function GuestRecordPage() {
+  const { snapshot, isInitialLoading } = useSnapshot();
+
+  if (isInitialLoading || !snapshot) return <Empty>読み込んでいます…</Empty>;
+
+  const guest = snapshot.guest;
+  if (!guest) return <Empty>参加者の情報が読み込めませんでした。画面を更新してください。</Empty>;
+
+  const conquest = conquestOf(snapshot.breweries, snapshot.requests, guest.clerkUserId);
+  const history = requestsOf(snapshot.requests, guest.clerkUserId);
+  const nameOf = (id: string) => snapshot.breweries.find((b) => b.id === id)?.name ?? '―';
+
+  return (
+    <>
+      <ScreenHeader>
+        <Eyebrow>RECORD</Eyebrow>
+        <Title>記録</Title>
+        <div className="mt-2">
+          <Note>受け取ったお酒だけを「制覇」として数えます。</Note>
+        </div>
+      </ScreenHeader>
+
+      {/* ── 制覇のまとめ ── */}
+      <div className="grid grid-cols-3 gap-2 px-5 pt-4">
+        <Stat label="蔵" value={conquest.breweriesVisited} total={conquest.breweries.length} />
+        <Stat label="銘柄" value={conquest.itemsConquered} total={conquest.itemsTotal} />
+        <Stat label="杯" value={conquest.cups} />
+      </div>
+
+      <SectionLabel>酒蔵ごとの制覇</SectionLabel>
+      <div className="flex flex-col gap-3 px-5">
+        {conquest.breweries.length === 0 ? (
+          <Empty>まだ銘柄を登録している蔵がありません。</Empty>
+        ) : (
+          conquest.breweries.map((b) => <BreweryRow key={b.brewery.id} conquest={b} />)
+        )}
+      </div>
+
+      <SectionLabel>注文の履歴（新しい順）</SectionLabel>
+      <div className="flex flex-col gap-2 px-5 pb-6">
+        {history.length === 0 ? (
+          <Empty>
+            まだ注文はありません。
+            <br />
+            「酒蔵をさがす」から銘柄を選んでください。
+          </Empty>
+        ) : (
+          history.map((request) => (
+            <div
+              key={request.id}
+              className="flex items-center gap-3 rounded-field border border-hairline bg-card px-3.5 py-3"
+            >
+              <span className="w-[74px] flex-none font-mono text-[12px] leading-none text-ink-55">
+                {formatJstDateTime(request.createdAt)}
+              </span>
+              <div className="flex min-w-0 flex-1 flex-col gap-1">
+                <span className="truncate text-[13.5px] leading-snug text-ink">{request.brand}</span>
+                <span className="truncate text-[11px] leading-none text-ink-45">
+                  {nameOf(request.breweryId)} ・ {request.cups} 杯 ・ {request.ticketCost} ポイント
+                </span>
+              </div>
+              <StatusBadge status={request.status} />
+            </div>
+          ))
+        )}
+      </div>
+    </>
+  );
+}
+
+function Stat({ label, value, total }: { label: string; value: number; total?: number }) {
+  return (
+    <div className="flex flex-col items-center gap-1 rounded-card border border-hairline bg-card px-2 py-3">
+      <span className="whitespace-nowrap">
+        <span className="font-display text-[26px] leading-none text-gold">{value}</span>
+        {total !== undefined && (
+          <span className="text-[12px] text-ink-45"> / {total}</span>
+        )}
+      </span>
+      <span className="text-[11px] leading-none text-ink-55">{label}</span>
+    </div>
+  );
+}
+
+function BreweryRow({ conquest }: { conquest: BreweryConquest }) {
+  const { brewery, items, conquered } = conquest;
+  const percent = items.length > 0 ? Math.round((conquered / items.length) * 100) : 0;
+  const complete = conquered === items.length;
+
+  return (
+    <Card>
+      <div className="flex items-baseline justify-between gap-2">
+        <span className="min-w-0 truncate font-display text-[17px] text-ink">{brewery.name}</span>
+        <span
+          className={`flex-none text-[12px] leading-none whitespace-nowrap ${
+            complete ? 'font-bold text-gold' : 'text-ink-55'
+          }`}
+        >
+          {complete ? '制覇！ ' : ''}
+          {conquered} / {items.length} 銘柄
+        </span>
+      </div>
+
+      {/* 在庫の StockBar は「残りが少ないと赤」の意味なので使わない。進み具合は金一色。 */}
+      <div
+        className="h-1.5 overflow-hidden rounded-sm bg-ink/10"
+        role="img"
+        aria-label={`${items.length} 銘柄中 ${conquered} 銘柄`}
+      >
+        <div className="h-full rounded-sm bg-gold" style={{ width: `${percent}%` }} />
+      </div>
+
+      <ul className="flex flex-col gap-1.5">
+        {items.map(({ item, cups }) => (
+          <li key={item.id} className="flex items-center justify-between gap-2 text-[12.5px]">
+            <span className={`min-w-0 truncate ${cups > 0 ? 'text-ink' : 'text-ink-45'}`}>
+              <span aria-hidden className={cups > 0 ? 'text-gold' : 'text-ink-45'}>
+                {cups > 0 ? '✓ ' : '・ '}
+              </span>
+              {item.name}
+            </span>
+            <span className="flex-none text-[11.5px] leading-none text-ink-55">
+              {cups > 0 ? `${cups} 杯` : 'まだ'}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </Card>
+  );
+}

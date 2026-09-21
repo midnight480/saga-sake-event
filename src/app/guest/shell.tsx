@@ -8,6 +8,8 @@ const TABS: Tab[] = [
   { href: '/guest', label: 'マイページ', icon: '◉' },
   { href: '/guest/breweries', label: '酒蔵をさがす', icon: '☷' },
   { href: '/guest/charge', label: 'チケット', icon: '＋' },
+  // チケットの右に置く（Issue #32）。飲んだものを振り返る画面。
+  { href: '/guest/record', label: '記録', icon: '✓' },
   { href: '/guest/help', label: 'ヘルプ', icon: '？' },
 ];
 
