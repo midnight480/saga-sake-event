@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState, type ReactNode } from 'react';
 
+import { NoticeBell } from '@/components/NoticeBell';
 import { ConfirmDialog } from '@/components/ui';
 import type { OrderingStatus } from '@/lib/domain';
 
@@ -65,12 +66,21 @@ export function AppShell({
           <header className="flex items-center justify-between gap-3 border-b border-hairline px-5 pt-[max(1rem,env(safe-area-inset-top))] pb-3">
             <div className="flex min-w-0 items-baseline gap-2">
               <span className="font-display text-[17px] tracking-[0.08em] text-ink">{role}</span>
+              {/*
+                蔵名や参加者番号があるときは、英字の役割名（BREWERY など）を省く。
+                右上に 🔔 を置いたぶん幅が減り、両方を並べると iPhone 15 Pro でも
+                蔵名が「…」で切れた。どの蔵の画面かを確かめる表示なので、飾りの
+                英字より蔵名を残す。主催者は蔵名が無いので、英字がそのまま出る。
+              */}
               <span className="truncate text-[10px] tracking-[0.12em] text-ink-45">
-                {roleEn}
-                {subject ? ` ─ ${subject}` : ''}
+                {subject ?? roleEn}
               </span>
             </div>
-            {status && <StatusChip status={status} />}
+            <div className="flex flex-none items-center gap-1.5">
+              {status && <StatusChip status={status} />}
+              {/* お知らせの履歴。右上に置き、未読の数を出す。 */}
+              <NoticeBell />
+            </div>
           </header>
 
           <nav aria-label="画面の切り替え" className="flex border-b border-hairline bg-surface py-1">

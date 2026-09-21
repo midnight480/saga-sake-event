@@ -190,17 +190,25 @@ export async function sendReadyNotice(requestId: number): Promise<number> {
   const request = rows[0];
   if (!request) return 0;
 
+  const notice = {
+    title: 'できあがりました',
+    body: `${request.brewery_name}の「${request.brand}」（${request.cups} 杯）を、ブースで受け取ってください。`,
+    url: '/guest',
+  };
+
+  // 先に 🔔 の履歴へ残す。通知を許可していない人・iPhone でホーム画面に
+  // 追加していない人にも、アプリの中では必ず見えるようにするため。
+  await sql`
+    INSERT INTO notices (clerk_user_id, kind, title, body, url)
+    VALUES (${request.guest_clerk_id}, 'ready', ${notice.title}, ${notice.body}, ${notice.url})
+  `;
+
   const targets = (await sql`
     SELECT endpoint, p256dh, auth FROM push_subscriptions
     WHERE clerk_user_id = ${request.guest_clerk_id}
   `) as PushTarget[];
 
-  return sendTo(targets, {
-    title: 'できあがりました',
-    body: `${request.brewery_name}の「${request.brand}」（${request.cups} 杯）を、ブースで受け取ってください。`,
-    url: '/guest',
-    tag: `ready-${requestId}`,
-  });
+  return sendTo(targets, { ...notice, tag: `ready-${requestId}` });
 }
 
 /**
@@ -227,6 +235,13 @@ export async function sendDueNotices(event: EventSettings, now: Date = new Date(
 
     const spec = MILESTONES.find((m) => m.id === (id as Milestone));
     if (!spec) continue;
+
+    // 🔔 の履歴にも残す。全員あてなので宛先は空（NULL）。
+    // 記録を作れた 1 台だけがここに来るので、履歴も 1 件しかできない。
+    await sql`
+      INSERT INTO notices (clerk_user_id, kind, title, body, url)
+      VALUES (NULL, 'milestone', ${spec.title}, ${spec.body}, '/')
+    `;
 
     try {
       await sendToAll(spec.title, spec.body, '/');

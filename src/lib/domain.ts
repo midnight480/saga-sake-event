@@ -616,3 +616,21 @@ export function conquestOf(
     cups: list.reduce((sum, b) => sum + b.items.reduce((s, i) => s + i.cups, 0), 0),
   };
 }
+
+// ─────────────────────────────────────────────────────────────
+// お知らせの履歴（右上の 🔔）
+// ─────────────────────────────────────────────────────────────
+
+export type NoticeKind = 'milestone' | 'ready';
+
+/** 🔔 に並ぶ 1 件。 */
+export interface Notice {
+  id: number;
+  kind: NoticeKind;
+  title: string;
+  body: string;
+  /** 押したときに開く画面。 */
+  url: string;
+  createdAt: string; // ISO
+  read: boolean;
+}

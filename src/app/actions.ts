@@ -17,6 +17,7 @@ import { AuthError, requireBrewery, requireOrganizer, requireViewer, syncRoleMet
 import {
   type BottleSize,
   type Inquiry,
+  type Notice,
   type EventPhase,
   type GuestKind,
   type RequestStatus,
@@ -486,6 +487,32 @@ export async function sendInquiry(input: {
     });
     refresh();
     return toAction(result);
+  });
+}
+
+// ═════════════════════════════════════════════════════════════
+// お知らせの履歴（右上の 🔔）。役割を問わず、本人のぶんだけ。
+// ═════════════════════════════════════════════════════════════
+
+export async function fetchNotices(): Promise<ActionResult<Notice[]>> {
+  return run(async () => {
+    const viewer = await requireViewer();
+    return { ok: true, value: await store.listNotices(viewer.userId) };
+  });
+}
+
+export async function markNoticeRead(noticeId: number): Promise<ActionResult> {
+  return run(async () => {
+    const viewer = await requireViewer();
+    await store.markNoticeRead(viewer.userId, noticeId);
+    return { ok: true };
+  });
+}
+
+export async function markAllNoticesRead(): Promise<ActionResult<number>> {
+  return run(async () => {
+    const viewer = await requireViewer();
+    return { ok: true, value: await store.markAllNoticesRead(viewer.userId) };
   });
 }
 

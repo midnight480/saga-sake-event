@@ -289,6 +289,29 @@ export const STATEMENTS: string[] = [
      PRIMARY KEY (event_date, milestone)
    )`,
 
+  // ── お知らせの履歴。右上の 🔔 から見返せるようにする。
+  //    OS の通知は一度消すと見返せず、iPhone はホーム画面に追加しないと届きも
+  //    しない。届いたかどうかに関係なく、アプリの中に残しておく。
+  //    clerk_user_id が NULL のものは全員あて（開始 10 分前などの節目）。──
+  `CREATE TABLE IF NOT EXISTS notices (
+     id            bigserial PRIMARY KEY,
+     clerk_user_id text,
+     kind          text        NOT NULL,
+     title         text        NOT NULL,
+     body          text        NOT NULL,
+     url           text        NOT NULL DEFAULT '/',
+     created_at    timestamptz NOT NULL DEFAULT now(),
+     CONSTRAINT notices_kind_valid CHECK (kind IN ('milestone', 'ready'))
+   )`,
+  `CREATE INDEX IF NOT EXISTS notices_user_idx ON notices (clerk_user_id, created_at DESC)`,
+  // 読んだ記録。1 人 1 件に 1 行。全員あてのお知らせも、読んだかどうかは人ごとに違う。
+  `CREATE TABLE IF NOT EXISTS notice_reads (
+     notice_id     bigint      NOT NULL REFERENCES notices (id) ON DELETE CASCADE,
+     clerk_user_id text        NOT NULL,
+     read_at       timestamptz NOT NULL DEFAULT now(),
+     PRIMARY KEY (notice_id, clerk_user_id)
+   )`,
+
   // ── 内部メモ（スキーマ版数など）──
   `CREATE TABLE IF NOT EXISTS app_meta (
      key   text PRIMARY KEY,

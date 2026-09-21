@@ -21,7 +21,11 @@ export async function GET() {
   try {
     const viewer = await getViewer();
     // 参加者の残高を混ぜて返すのは、本人がログインしているときだけ。
-    const snapshot = await getSnapshot(viewer?.role === 'guest' ? viewer.userId : undefined);
+    // 🔔 の未読数は役割を問わず、ログインしている本人のぶんを返す。
+    const snapshot = await getSnapshot(
+      viewer?.role === 'guest' ? viewer.userId : undefined,
+      viewer?.userId,
+    );
 
     // 節目を過ぎていればお知らせを送る。cron を使わずに済ませるため、
     // 画面が現在値を取りに来るこの機会に確かめている。送った記録は

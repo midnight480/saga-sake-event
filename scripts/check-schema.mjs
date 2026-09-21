@@ -162,7 +162,7 @@ async function main() {
   );
   check(
     '必要な表がそろっている',
-    ['breweries', 'events', 'guests', 'items', 'organizers', 'requests', 'ticket_batches', 'tickets']
+    ['breweries', 'events', 'guests', 'items', 'notice_reads', 'notices', 'organizers', 'requests', 'ticket_batches', 'tickets']
       .every((t) => tables.some((r) => r.tablename === t)),
     tables.map((r) => r.tablename).join(', '),
   );
