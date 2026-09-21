@@ -64,14 +64,15 @@ export interface Brewery {
   booth: string;
   accepting: boolean;
   loginId: string; // kura-001
+  /** ログイン用のアカウントが実際に作られているか。 */
+  hasLoginAccount: boolean;
   items: Item[];
 }
 
 export interface TicketBatch {
   id: string;
-  label: string; // 前売券 10枚
+  label: string; // 前売券
   code: string; // SAGA-ADV
-  canAdd: boolean; // 当日券だけ追加発行できる
   cupsPerTicket: number; // 1 枚の QR で何枚分か
   issued: number; // 発行した QR の枚数
   redeemed: number; // 読み取られた枚数

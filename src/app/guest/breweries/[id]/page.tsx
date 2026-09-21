@@ -56,8 +56,9 @@ export default function GuestBreweryDetailPage() {
         </Link>
         <Title size="lg">{brewery.name}</Title>
         <div className="mt-1.5 text-[12px] leading-[1.7] text-ink-55">
-          {brewery.area}
-          {brewery.booth ? ` ・ ブース ${brewery.booth}` : ''} ・ 待ち {waiting} 件
+          {[brewery.booth && `ブース ${brewery.booth}`, brewery.area, `待ち ${waiting} 件`]
+            .filter(Boolean)
+            .join(' ・ ')}
         </div>
         {guest && (
           <div className="mt-2 text-[12px] leading-none text-gold">

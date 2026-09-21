@@ -11,13 +11,12 @@ import {
   Eyebrow,
   Note,
   Notice,
-  RadioCard,
   SectionLabel,
   ScreenHeader,
   Title,
   inputClass,
 } from '@/components/ui';
-import { SAGA_AREAS, type Brewery } from '@/lib/domain';
+import type { Brewery } from '@/lib/domain';
 import { useSnapshot } from '@/lib/useSnapshot';
 
 /** 発行直後に 1 度だけ見せる資格情報。閉じると二度と出せない。 */
@@ -36,7 +35,6 @@ export default function BreweriesPage() {
   const [credential, setCredential] = useState<Credential | null>(null);
 
   const [name, setName] = useState('');
-  const [area, setArea] = useState<string>(SAGA_AREAS[0]);
 
   if (isInitialLoading || !snapshot) return <Empty>読み込んでいます…</Empty>;
 
@@ -47,7 +45,7 @@ export default function BreweriesPage() {
     setError(null);
     setWarning(null);
     startTransition(async () => {
-      const result = await addBrewery({ name: name.trim(), area });
+      const result = await addBrewery({ name: name.trim() });
       if (!result.ok) {
         setError(result.reason);
       } else if (result.value) {
@@ -101,12 +99,9 @@ export default function BreweriesPage() {
             placeholder="酒蔵名（例：天山酒造）"
             className={inputClass}
           />
-          <span className="text-[11.5px] leading-none text-ink-55">所在地をえらぶ</span>
-          <div role="radiogroup" aria-label="所在地" className="grid grid-cols-2 gap-2">
-            {SAGA_AREAS.map((a) => (
-              <RadioCard key={a} label={a} active={area === a} onClick={() => setArea(a)} />
-            ))}
-          </div>
+          <Note>
+            ブース番号は自動で割り当てます（あとから前後にずらせます）。
+          </Note>
           <Button tone="go" block onClick={submit} disabled={pending || !name.trim()}>
             {pending ? '発行しています…' : '登録してID・パスワードを発行'}
           </Button>
@@ -250,11 +245,17 @@ function BreweryCard({ brewery }: { brewery: Brewery }) {
   return (
     <Card animate>
       <div className="flex items-start justify-between gap-2.5">
-        <div className="flex min-w-0 flex-col gap-1">
+        <div className="flex min-w-0 flex-col gap-1.5">
           <span className="font-display text-[19px] tracking-[0.04em] text-ink">
             {brewery.name}
           </span>
-          <span className="text-[11.5px] leading-none text-ink-55">{brewery.area}</span>
+          <span
+            className={`w-fit rounded-full px-2.5 py-1.5 text-[10.5px] font-bold leading-none ${
+              brewery.hasLoginAccount ? 'bg-matcha/16 text-matcha' : 'bg-terracotta/20 text-terracotta-soft'
+            }`}
+          >
+            {brewery.hasLoginAccount ? 'ログインできます' : 'ログインアカウント未作成'}
+          </span>
         </div>
         <button
           type="button"
@@ -317,6 +318,13 @@ function BreweryCard({ brewery }: { brewery: Brewery }) {
         </div>
       </dl>
 
+      {!brewery.hasLoginAccount && !fresh && (
+        <Notice tone="warn" title="この蔵はまだログインできません">
+          ログイン用のアカウントが作られていません。Clerk の設定で「Username」が有効になっているか
+          確かめてから、下のボタンを押してください。
+        </Notice>
+      )}
+
       {fresh ? (
         <div className="flex flex-col gap-2 rounded-field border border-gold/60 bg-gold/10 p-3.5">
           <span className="text-[11.5px] leading-none text-gold">新しいパスワード</span>
@@ -331,8 +339,17 @@ function BreweryCard({ brewery }: { brewery: Brewery }) {
           </Button>
         </div>
       ) : (
-        <Button tone="gold" block onClick={regenerate} disabled={pending}>
-          {pending ? '作成しています…' : 'パスワードを再発行する'}
+        <Button
+          tone={brewery.hasLoginAccount ? 'gold' : 'go'}
+          block
+          onClick={regenerate}
+          disabled={pending}
+        >
+          {pending
+            ? '作成しています…'
+            : brewery.hasLoginAccount
+              ? 'パスワードを再発行する'
+              : 'ログインアカウントを作成する'}
         </Button>
       )}
     </Card>

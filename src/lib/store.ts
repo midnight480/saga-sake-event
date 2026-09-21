@@ -113,6 +113,7 @@ export async function listBreweries(): Promise<Brewery[]> {
   const rows = (await sql`
     SELECT
       b.id, b.name, b.area, b.booth, b.accepting, b.login_id,
+      (b.clerk_user_id IS NOT NULL) AS has_login_account,
       i.id  AS item_id, i.name AS item_name, i.kind, i.polish, i.size,
       i.cups_per_bottle, i.bottles, i.used_cups, i.ticket_cost,
       COALESCE((
@@ -135,6 +136,7 @@ export async function listBreweries(): Promise<Brewery[]> {
         booth: String(row.booth),
         accepting: Boolean(row.accepting),
         loginId: String(row.login_id),
+        hasLoginAccount: Boolean(row.has_login_account),
         items: [],
       });
     }
@@ -184,7 +186,8 @@ async function nextLoginId(): Promise<string> {
 
 export async function createBrewery(input: {
   name: string;
-  area: string;
+  /** 省略できる。会場ではブース番号のほうが役に立つので必須にしない。 */
+  area?: string;
 }): Promise<Result<{ id: string; loginId: string; password: string }>> {
   const name = input.name.trim();
   if (!name) return fail('酒蔵名を入力してください。');
@@ -202,7 +205,7 @@ export async function createBrewery(input: {
 
   await sql`
     INSERT INTO breweries (id, name, area, booth, login_id, sort_order)
-    VALUES (${id}, ${name}, ${input.area}, ${booth}, ${loginId},
+    VALUES (${id}, ${name}, ${input.area ?? ''}, ${booth}, ${loginId},
             (SELECT COALESCE(MAX(sort_order), 0) + 1 FROM breweries))
   `;
 
@@ -336,12 +339,12 @@ export async function listTicketBatches(): Promise<TicketBatch[]> {
   const sql = await db();
   const rows = (await sql`
     SELECT
-      tb.id, tb.label, tb.code, tb.can_add, tb.cups_per_ticket,
+      tb.id, tb.label, tb.code, tb.cups_per_ticket,
       count(t.code)                                        AS issued,
       count(t.code) FILTER (WHERE t.redeemed_by IS NOT NULL) AS redeemed
     FROM ticket_batches tb
     LEFT JOIN tickets t ON t.batch_id = tb.id
-    GROUP BY tb.id, tb.label, tb.code, tb.can_add, tb.cups_per_ticket, tb.sort_order
+    GROUP BY tb.id, tb.label, tb.code, tb.cups_per_ticket, tb.sort_order
     ORDER BY tb.sort_order
   `) as Record<string, unknown>[];
 
@@ -349,7 +352,6 @@ export async function listTicketBatches(): Promise<TicketBatch[]> {
     id: String(r.id),
     label: String(r.label),
     code: String(r.code),
-    canAdd: Boolean(r.can_add),
     cupsPerTicket: Number(r.cups_per_ticket),
     issued: Number(r.issued),
     redeemed: Number(r.redeemed),
@@ -379,6 +381,96 @@ export async function issueTickets(batchId: string, count: number): Promise<Resu
     ON CONFLICT (code) DO NOTHING
   `;
   return ok(count);
+}
+
+/**
+ * 券 1 枚で何枚分のチケットになるかを変える。
+ *
+ * すでに発行して配った券の価値まで変わってしまうので、
+ * まだ 1 枚も発行していない券種でだけ変更を許す。
+ */
+export async function setCupsPerTicket(batchId: string, cups: number): Promise<Result> {
+  if (cups < 1 || cups > 100) return fail('1〜100 枚のあいだで指定してください。');
+
+  const sql = await db();
+  const rows = (await sql`
+    UPDATE ticket_batches SET cups_per_ticket = ${cups}
+    WHERE id = ${batchId}
+      AND NOT EXISTS (SELECT 1 FROM tickets WHERE batch_id = ${batchId})
+    RETURNING id
+  `) as { id: string }[];
+
+  return rows.length > 0
+    ? ok(undefined)
+    : fail('すでに発行した券があるため変更できません。先に発行済みの券を使い切るか、別の券種をお使いください。');
+}
+
+/**
+ * 用意する券の枚数を「この数にする」形で決める。
+ *
+ * 主催者の頭の中では「前売を 300 枚用意する」であって、「いま何枚あるから
+ * あと何枚足す」ではない。足し算を人にさせないために、目標の数を受け取って
+ * 差分をこちらで埋める。
+ *
+ * 減らす方向は、まだ読み取られていない券からしか削れない。すでに誰かの
+ * 手に渡って読み取られた券を消すと、その人の残高の裏づけが無くなるため。
+ */
+export async function setTicketCount(
+  batchId: string,
+  target: number,
+): Promise<Result<{ issued: number; added: number; removed: number }>> {
+  if (target < 0 || target > 5000) return fail('0〜5000 枚のあいだで指定してください。');
+
+  const sql = await db();
+  const rows = (await sql`
+    SELECT
+      count(*)::int                                        AS issued,
+      count(*) FILTER (WHERE redeemed_by IS NULL)::int     AS unredeemed
+    FROM tickets WHERE batch_id = ${batchId}
+  `) as { issued: number; unredeemed: number }[];
+
+  const issued = Number(rows[0]?.issued ?? 0);
+  const unredeemed = Number(rows[0]?.unredeemed ?? 0);
+
+  if (target === issued) return ok({ issued, added: 0, removed: 0 });
+
+  if (target > issued) {
+    const added = target - issued;
+    const result = await issueTickets(batchId, added);
+    if (!result.ok) return result;
+    return ok({ issued: target, added, removed: 0 });
+  }
+
+  const removing = issued - target;
+  if (removing > unredeemed) {
+    return fail(
+      `すでに ${issued - unredeemed} 枚が読み取られているため、${issued - unredeemed} 枚より少なくはできません。`,
+    );
+  }
+
+  const removed = (await sql`
+    DELETE FROM tickets
+    WHERE code IN (
+      SELECT code FROM tickets
+      WHERE batch_id = ${batchId} AND redeemed_by IS NULL
+      ORDER BY created_at DESC, code DESC
+      LIMIT ${removing}
+    )
+    RETURNING code
+  `) as { code: string }[];
+
+  return ok({ issued: target, added: 0, removed: removed.length });
+}
+
+/** 発行した券をすべて取り消す。まだ 1 枚も読み取られていない場合だけ。 */
+export async function discardTickets(batchId: string): Promise<Result<number>> {
+  const sql = await db();
+  const rows = (await sql`
+    DELETE FROM tickets
+    WHERE batch_id = ${batchId} AND redeemed_by IS NULL
+    RETURNING code
+  `) as { code: string }[];
+  return ok(rows.length);
 }
 
 /** 印刷用に、まだ読み取られていない券コードを取り出す。 */
