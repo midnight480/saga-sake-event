@@ -405,6 +405,63 @@ export async function setCupsPerTicket(batchId: string, cups: number): Promise<R
     : fail('すでに発行した券があるため変更できません。先に発行済みの券を使い切るか、別の券種をお使いください。');
 }
 
+/**
+ * 用意する券の枚数を「この数にする」形で決める。
+ *
+ * 主催者の頭の中では「前売を 300 枚用意する」であって、「いま何枚あるから
+ * あと何枚足す」ではない。足し算を人にさせないために、目標の数を受け取って
+ * 差分をこちらで埋める。
+ *
+ * 減らす方向は、まだ読み取られていない券からしか削れない。すでに誰かの
+ * 手に渡って読み取られた券を消すと、その人の残高の裏づけが無くなるため。
+ */
+export async function setTicketCount(
+  batchId: string,
+  target: number,
+): Promise<Result<{ issued: number; added: number; removed: number }>> {
+  if (target < 0 || target > 5000) return fail('0〜5000 枚のあいだで指定してください。');
+
+  const sql = await db();
+  const rows = (await sql`
+    SELECT
+      count(*)::int                                        AS issued,
+      count(*) FILTER (WHERE redeemed_by IS NULL)::int     AS unredeemed
+    FROM tickets WHERE batch_id = ${batchId}
+  `) as { issued: number; unredeemed: number }[];
+
+  const issued = Number(rows[0]?.issued ?? 0);
+  const unredeemed = Number(rows[0]?.unredeemed ?? 0);
+
+  if (target === issued) return ok({ issued, added: 0, removed: 0 });
+
+  if (target > issued) {
+    const added = target - issued;
+    const result = await issueTickets(batchId, added);
+    if (!result.ok) return result;
+    return ok({ issued: target, added, removed: 0 });
+  }
+
+  const removing = issued - target;
+  if (removing > unredeemed) {
+    return fail(
+      `すでに ${issued - unredeemed} 枚が読み取られているため、${issued - unredeemed} 枚より少なくはできません。`,
+    );
+  }
+
+  const removed = (await sql`
+    DELETE FROM tickets
+    WHERE code IN (
+      SELECT code FROM tickets
+      WHERE batch_id = ${batchId} AND redeemed_by IS NULL
+      ORDER BY created_at DESC, code DESC
+      LIMIT ${removing}
+    )
+    RETURNING code
+  `) as { code: string }[];
+
+  return ok({ issued: target, added: 0, removed: removed.length });
+}
+
 /** 発行した券をすべて取り消す。まだ 1 枚も読み取られていない場合だけ。 */
 export async function discardTickets(batchId: string): Promise<Result<number>> {
   const sql = await db();

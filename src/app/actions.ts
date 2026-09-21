@@ -454,6 +454,19 @@ export async function setCupsPerTicket(batchId: string, cups: number): Promise<A
   });
 }
 
+/** 用意する券の枚数を「この数にする」形で決める。差分はこちらで埋める。 */
+export async function setTicketCount(
+  batchId: string,
+  target: number,
+): Promise<ActionResult<{ issued: number; added: number; removed: number }>> {
+  return run(async () => {
+    await requireOrganizer();
+    const result = await store.setTicketCount(batchId, target);
+    refresh();
+    return toAction(result);
+  });
+}
+
 /** 発行した券をまとめて取り消す（まだ読み取られていないものだけ）。 */
 export async function discardTickets(batchId: string): Promise<ActionResult<number>> {
   return run(async () => {
