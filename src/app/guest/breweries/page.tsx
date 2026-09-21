@@ -1,8 +1,9 @@
 'use client';
 
 import Link from 'next/link';
+import { useState } from 'react';
 
-import { CrowdBadge, Empty, Note, ScreenHeader, Title } from '@/components/ui';
+import { Button, CrowdBadge, Empty, Note, ScreenHeader, Title } from '@/components/ui';
 import {
   crowdLevel,
   itemAvailableCups,
@@ -91,70 +92,91 @@ function BreweryRow({
   const soldOut = cheapest === null;
   const short = !soldOut && cheapest !== null && cheapest > tickets;
 
+  // 銘柄は初めは畳んでおく（Issue #37）。蔵ごとに何銘柄も並ぶと、一覧が縦に
+  // 長くなって目当ての蔵にたどり着けない。どこへ行くかは、蔵名・混み具合・
+  // 「あと何ポイント」で決められるので、銘柄は見たい蔵だけ開けばよい。
+  const [open, setOpen] = useState(false);
+
+  // カード全体をリンクにすると、中に開閉のボタンを置けない（リンクの中に
+  // ボタンを入れると、どちらが押されたか分からなくなる）。上の段だけをリンクにする。
   return (
-    <Link
-      href={`/guest/breweries/${brewery.id}`}
-      className={`flex w-full flex-col gap-3 rounded-card border border-hairline bg-card p-4 text-left transition-colors hover:border-hairline-strong ${
+    <div
+      className={`flex w-full flex-col gap-3 rounded-card border border-hairline bg-card p-4 transition-colors hover:border-hairline-strong ${
         affordable ? '' : 'opacity-55'
       }`}
     >
-      <div className="flex w-full items-center justify-between gap-2.5">
-        <div className="flex min-w-0 flex-col gap-1">
-          <span className="font-display text-[19px] tracking-[0.04em] text-ink">
-            {brewery.name}
-          </span>
-          {[brewery.booth && `ブース ${brewery.booth}`, brewery.area].filter(Boolean).length > 0 && (
-            <span className="text-[11.5px] leading-none text-ink-55">
-              {[brewery.booth && `ブース ${brewery.booth}`, brewery.area]
-                .filter(Boolean)
-                .join(' ・ ')}
+      <Link href={`/guest/breweries/${brewery.id}`} className="flex w-full flex-col gap-3 text-left">
+        <div className="flex w-full items-center justify-between gap-2.5">
+          <div className="flex min-w-0 flex-col gap-1">
+            <span className="font-display text-[19px] tracking-[0.04em] text-ink">
+              {brewery.name}
             </span>
-          )}
+            {[brewery.booth && `ブース ${brewery.booth}`, brewery.area].filter(Boolean).length > 0 && (
+              <span className="text-[11.5px] leading-none text-ink-55">
+                {[brewery.booth && `ブース ${brewery.booth}`, brewery.area]
+                  .filter(Boolean)
+                  .join(' ・ ')}
+              </span>
+            )}
+          </div>
+          <CrowdBadge level={crowdLevel(waiting)} closed={!brewery.accepting} />
         </div>
-        <CrowdBadge level={crowdLevel(waiting)} closed={!brewery.accepting} />
-      </div>
 
-      {short && (
-        <span className="w-fit rounded-full bg-terracotta/18 px-2.5 py-1.5 text-[11px] font-bold leading-none text-terracotta-soft">
-          あと {cheapest! - tickets} ポイント あれば頼めます
-        </span>
-      )}
-      {soldOut && brewery.items.length > 0 && (
-        <span className="w-fit rounded-full bg-ink/10 px-2.5 py-1.5 text-[11px] font-bold leading-none text-ink-55">
-          いま頼めるお酒がありません
-        </span>
-      )}
+        {short && (
+          <span className="w-fit rounded-full bg-terracotta/18 px-2.5 py-1.5 text-[11px] font-bold leading-none text-terracotta-soft">
+            あと {cheapest! - tickets} ポイント あれば頼めます
+          </span>
+        )}
+        {soldOut && brewery.items.length > 0 && (
+          <span className="w-fit rounded-full bg-ink/10 px-2.5 py-1.5 text-[11px] font-bold leading-none text-ink-55">
+            いま頼めるお酒がありません
+          </span>
+        )}
+      </Link>
 
       {brewery.items.length > 0 && (
-        <div className="flex w-full flex-col gap-1.5">
-          {brewery.items.map((item) => {
-            const left = itemAvailableCups(item);
-            const enough = left > 0 && item.ticketCost <= tickets;
-            return (
-              <div
-                key={item.id}
-                className="flex items-baseline justify-between gap-2 rounded-[7px] bg-ink/7 px-2.5 py-2"
-              >
-                <span
-                  className={`min-w-0 truncate text-[12px] leading-none ${
-                    left === 0 ? 'text-ink-45 line-through' : 'text-ink-70'
-                  }`}
-                >
-                  {item.name}
-                </span>
-                <span className="flex flex-none items-baseline gap-2 text-[11px] leading-none">
-                  <span className={enough ? 'font-bold text-gold' : 'text-ink-45'}>
-                    {item.ticketCost} ポイント
-                  </span>
-                  <span className={left === 0 ? 'text-terracotta-soft' : 'text-ink-45'}>
-                    {left === 0 ? '完売' : `残${left}`}
-                  </span>
-                </span>
-              </div>
-            );
-          })}
-        </div>
+        <>
+          {open && (
+            <div className="flex w-full flex-col gap-1.5">
+              {brewery.items.map((item) => {
+                const left = itemAvailableCups(item);
+                const enough = left > 0 && item.ticketCost <= tickets;
+                return (
+                  <div
+                    key={item.id}
+                    className="flex items-baseline justify-between gap-2 rounded-[7px] bg-ink/7 px-2.5 py-2"
+                  >
+                    <span
+                      className={`min-w-0 truncate text-[12px] leading-none ${
+                        left === 0 ? 'text-ink-45 line-through' : 'text-ink-70'
+                      }`}
+                    >
+                      {item.name}
+                    </span>
+                    <span className="flex flex-none items-baseline gap-2 text-[11px] leading-none">
+                      <span className={enough ? 'font-bold text-gold' : 'text-ink-45'}>
+                        {item.ticketCost} ポイント
+                      </span>
+                      <span className={left === 0 ? 'text-terracotta-soft' : 'text-ink-45'}>
+                        {left === 0 ? '完売' : `残${left}`}
+                      </span>
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          <Button
+            tone="flat"
+            block
+            onClick={() => setOpen((v) => !v)}
+            aria-expanded={open}
+          >
+            {open ? '銘柄をとじる ▲' : `銘柄を見る（${brewery.items.length} 件） ▼`}
+          </Button>
+        </>
       )}
-    </Link>
+    </div>
   );
 }
