@@ -737,6 +737,59 @@ export async function setRequestStatus(
 }
 
 // ─────────────────────────────────────────────────────────────
+// 次のイベントのための片付け
+// ─────────────────────────────────────────────────────────────
+
+export interface ResetCounts {
+  requests: number;
+  items: number;
+  tickets: number;
+  guests: number;
+  inquiries: number;
+}
+
+/**
+ * 前回のイベントの記録を片付ける。
+ *
+ * 残すもの: 酒蔵のアカウント（名前・蔵ID・ログイン）、主催者、
+ *           券種ごとのポイント設定、お知らせの宛先
+ * 消すもの: 注文、銘柄、券、参加者の残高、問い合わせ、送信済みの節目
+ *
+ * 酒蔵を残すのは、毎年だいたい同じ蔵が出るのと、アカウントを作り直すと
+ * ID とパスワードを配り直すことになるため。銘柄は毎年変わるので消す。
+ * どのみち開場前に持ち込み登録をしてもらう運用になっている。
+ *
+ * すべて 1 つのトランザクションで行う。途中で切れて「注文だけ消えて券は
+ * 残っている」のような、どっちつかずの状態を作らないため。
+ */
+export async function resetEvent(): Promise<Result<ResetCounts>> {
+  const sql = await db();
+
+  const [requests, items, tickets, guests, inquiries] = await sql.transaction((txn) => [
+    // 参照している側から先に消す。
+    txn.query('DELETE FROM requests RETURNING id'),
+    txn.query('DELETE FROM items RETURNING id'),
+    txn.query('DELETE FROM tickets RETURNING code'),
+    txn.query('DELETE FROM guests RETURNING clerk_user_id'),
+    txn.query('DELETE FROM inquiries RETURNING id'),
+    // 節目のお知らせは、次のイベントで改めて送れるようにする。
+    txn.query('DELETE FROM sent_notices'),
+    // 参加者番号を振り直す。次のイベントで #10001 から始まるようにする。
+    txn.query('ALTER SEQUENCE guest_no_seq RESTART WITH 10001'),
+    // 受付は「予定どおり」に戻す。手で開けたままにして忘れると危ない。
+    txn.query("UPDATE events SET phase = 'auto' WHERE id = 1"),
+  ]);
+
+  return ok({
+    requests: (requests as unknown[]).length,
+    items: (items as unknown[]).length,
+    tickets: (tickets as unknown[]).length,
+    guests: (guests as unknown[]).length,
+    inquiries: (inquiries as unknown[]).length,
+  });
+}
+
+// ─────────────────────────────────────────────────────────────
 // 問い合わせ
 // ─────────────────────────────────────────────────────────────
 

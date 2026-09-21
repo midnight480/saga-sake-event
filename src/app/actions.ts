@@ -614,6 +614,19 @@ export async function setTicketCount(
   });
 }
 
+/**
+ * 次のイベントのために片付ける。
+ * 何が消えて何が残るかは store.resetEvent に書いてある。
+ */
+export async function resetEvent(): Promise<ActionResult<store.ResetCounts>> {
+  return run(async () => {
+    await requireOrganizer();
+    const result = await store.resetEvent();
+    refresh();
+    return toAction(result);
+  });
+}
+
 /** 発行した券をまとめて取り消す（まだ読み取られていないものだけ）。 */
 export async function discardTickets(batchId: string): Promise<ActionResult<number>> {
   return run(async () => {

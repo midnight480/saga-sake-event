@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useTransition } from 'react';
 
-import { saveEvent, setCupsPerTicket, setPhase } from '@/app/actions';
+import { resetEvent, saveEvent, setCupsPerTicket, setPhase } from '@/app/actions';
 import {
   Button,
   Card,
@@ -233,7 +233,93 @@ export default function EventSettingsPage() {
           </ConfirmDialog>
         </div>
       </div>
+
+      <SectionLabel>新しいイベントを始める</SectionLabel>
+      <div className="px-5 pb-7">
+        <ResetEvent />
+      </div>
     </>
+  );
+}
+
+/**
+ * 次のイベントのための片付け。
+ *
+ * 前回の残りが混ざっていると、前回のポイントで飲めてしまったり、
+ * 在庫が前回のままだったりする。年に一度しか押さないが、押せないと
+ * 毎回データベースを作り直すことになる。
+ */
+function ResetEvent() {
+  const { snapshot, refresh } = useSnapshot();
+  const [confirming, setConfirming] = useState(false);
+  const [done, setDone] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+
+  const breweries = snapshot?.breweries.length ?? 0;
+  const items = snapshot?.breweries.reduce((sum, b) => sum + b.items.length, 0) ?? 0;
+  const requests = snapshot?.requests.length ?? 0;
+  const tickets = snapshot?.batches.reduce((sum, b) => sum + b.issued, 0) ?? 0;
+
+  const run = () => {
+    setConfirming(false);
+    setError(null);
+    setDone(null);
+    startTransition(async () => {
+      const result = await resetEvent();
+      if (result.ok && result.value) {
+        const c = result.value;
+        setDone(
+          `片付けました。注文 ${c.requests} 件、銘柄 ${c.items} 件、券 ${c.tickets} 枚、` +
+            `参加者 ${c.guests} 名、問い合わせ ${c.inquiries} 件を消しました。`,
+        );
+      } else if (!result.ok) {
+        setError(result.reason);
+      }
+      await refresh();
+    });
+  };
+
+  return (
+    <Card className="border-terracotta/40">
+      <Note>
+        前回のイベントの記録を片付けて、次のイベントを始められるようにします。
+        酒蔵のアカウントは残るので、蔵ID とパスワードを配り直す必要はありません。
+      </Note>
+
+      {error && <Notice tone="danger">{error}</Notice>}
+      {done && <Notice tone="info">{done}</Notice>}
+
+      <Button tone="flat" block onClick={() => setConfirming(true)} disabled={pending}>
+        {pending ? '片付けています…' : '前回の記録を片付ける'}
+      </Button>
+
+      <ConfirmDialog
+        open={confirming}
+        title="前回の記録を片付けますか"
+        confirmLabel="はい、片付けます"
+        onConfirm={run}
+        onCancel={() => setConfirming(false)}
+        pending={pending}
+      >
+        <strong className="text-terracotta-soft">消えるもの</strong>
+        <br />
+        注文 {requests} 件 / 銘柄 {items} 件 / 券 {tickets} 枚 / 参加者の残高 / 問い合わせ
+        <br />
+        <br />
+        <strong className="text-matcha">残るもの</strong>
+        <br />
+        酒蔵 {breweries} 蔵のアカウント（蔵ID・パスワードはそのまま）/ 主催者 /
+        券種ごとのポイント設定
+        <br />
+        <br />
+        参加者はもう一度ログインすると、ポイント 0 から始まります。
+        蔵には、開場前に銘柄と本数を登録し直してもらってください。
+        <br />
+        <br />
+        この操作は元に戻せません。
+      </ConfirmDialog>
+    </Card>
   );
 }
 
