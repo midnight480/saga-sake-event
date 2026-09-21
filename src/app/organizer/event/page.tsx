@@ -115,8 +115,13 @@ export default function EventSettingsPage() {
           />
         </Field>
 
+        {/*
+          min-w-0 が要る。flex の子は既定で min-width:auto なので、中の入力欄が
+          縮まないと列も縮まず、行が枠からはみ出す。iOS Safari の時刻入力は
+          中身から決まる幅を持っていて、まさにこれで右にはみ出していた。
+        */}
         <div className="flex gap-3">
-          <div className="flex-1">
+          <div className="min-w-0 flex-1">
             <Field label="開始時刻">
               <input
                 type="time"
@@ -126,7 +131,7 @@ export default function EventSettingsPage() {
               />
             </Field>
           </div>
-          <div className="flex-1">
+          <div className="min-w-0 flex-1">
             <Field label="終了時刻">
               <input
                 type="time"
