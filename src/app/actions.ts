@@ -522,6 +522,17 @@ export async function discardTickets(batchId: string): Promise<ActionResult<numb
   });
 }
 
+/** 券のコードを、使われたかどうかとあわせて取り出す。 */
+export async function fetchTickets(
+  batchId: string,
+  limit = 500,
+): Promise<ActionResult<{ code: string; redeemed: boolean }[]>> {
+  return run(async () => {
+    await requireOrganizer();
+    return { ok: true, value: await store.listTickets(batchId, limit) };
+  });
+}
+
 /** 印刷用に、まだ読み取られていない券コードを取り出す。 */
 export async function fetchUnredeemedCodes(
   batchId: string,

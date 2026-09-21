@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useEffect, useState, useTransition } from 'react';
 
-import { discardTickets, issueTickets } from '@/app/actions';
+import { discardTickets, fetchTickets, issueTickets } from '@/app/actions';
 import {
   Button,
   Card,
@@ -36,8 +36,8 @@ export default function TicketsPage() {
         <Title>チケットQRの発行</Title>
         <div className="mt-2">
           <Note>
-            券種ごとに、何枚 刷るかを決めて印刷します。支払いと金額はこのアプリでは扱いません。
-            参加者が券のQRを読み取ると、その場でポイントが入ります。
+            受付に貼る QR は 1 枚だけです。使い回せます。参加者はその QR で画面を開き、
+            紙の券に書かれたコードを打ち込みます。支払いと金額はこのアプリでは扱いません。
           </Note>
         </div>
       </ScreenHeader>
@@ -51,6 +51,8 @@ export default function TicketsPage() {
           </Notice>
         </div>
       )}
+
+      <SharedQr />
 
       <div className="flex flex-col gap-3 px-5 py-4">
         {snapshot.batches.map((batch) => (
@@ -115,14 +117,6 @@ function BatchCard({ batch }: { batch: TicketBatch }) {
   return (
     <Card>
       <div className="flex items-center gap-3.5">
-        <div
-          aria-hidden
-          className="size-16 flex-none rounded-lg bg-ink"
-          style={{
-            backgroundImage:
-              'repeating-linear-gradient(90deg,#16221b 0 4px,transparent 4px 9px),repeating-linear-gradient(0deg,#16221b 0 4px,transparent 4px 9px)',
-          }}
-        />
         <div className="flex min-w-0 flex-1 flex-col gap-1.5">
           <div className="flex flex-wrap items-center gap-2">
             <span className="font-display text-[18px] text-ink">{batch.label}</span>
@@ -184,6 +178,8 @@ function BatchCard({ batch }: { batch: TicketBatch }) {
         </Button>
       </div>
 
+      <CodeList batchId={batch.id} issued={batch.issued} />
+
       {/* ── 印刷・取り消し ── */}
       <div className="flex gap-2 border-t border-hairline pt-3">
         <Button
@@ -225,5 +221,99 @@ function BatchCard({ batch }: { batch: TicketBatch }) {
         </div>
       )}
     </Card>
+  );
+}
+
+/**
+ * 受付に貼る共通 QR。
+ *
+ * 券ごとに別の QR を刷るのをやめた。貼るのは 1 枚で、当日ずっと使い回せる。
+ * 誰が何ポイント受け取るかは、紙に書かれたコードのほうで決まる。
+ */
+function SharedQr() {
+  return (
+    <div className="px-5">
+      <Card>
+        <div className="flex items-baseline justify-between gap-2">
+          <span className="font-display text-[18px] text-ink">受付に貼る QR</span>
+          <span className="text-[11.5px] leading-none text-ink-55">1 枚で使い回せます</span>
+        </div>
+
+        <div className="flex items-center gap-4">
+          <div className="size-28 flex-none rounded-lg bg-ink p-2">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/api/qr" alt="ポイントを追加する画面の QR コード" className="size-full" />
+          </div>
+          <p className="text-[12px] leading-[1.8] text-ink-55">
+            参加者はこの QR でポイントの画面を開き、
+            <strong className="font-bold text-ink">紙の券に書かれたコード</strong>
+            を打ち込みます。
+            <br />
+            券の種類はコードで見分けるので、QR は共通で構いません。
+          </p>
+        </div>
+
+        <Button
+          tone="gold"
+          block
+          onClick={() => window.open('/organizer/tickets/print', '_blank')}
+        >
+          QR とコードを印刷する
+        </Button>
+      </Card>
+    </div>
+  );
+}
+
+/** 発行した券のコード。使い終わったものは、その場で分かるようにする。 */
+function CodeList({ batchId, issued }: { batchId: string; issued: number }) {
+  const [open, setOpen] = useState(false);
+  const [rows, setRows] = useState<{ code: string; redeemed: boolean }[] | null>(null);
+  const [pending, startTransition] = useTransition();
+
+  // 開いたときと、発行枚数が変わったときに読み直す。
+  useEffect(() => {
+    if (!open) return;
+    startTransition(async () => {
+      const result = await fetchTickets(batchId);
+      if (result.ok && result.value) setRows(result.value);
+    });
+  }, [open, batchId, issued]);
+
+  if (issued === 0) return null;
+
+  return (
+    <div className="flex flex-col gap-2 border-t border-hairline pt-3">
+      <Button tone="flat" block onClick={() => setOpen((v) => !v)}>
+        {open ? 'コードをとじる ▲' : `コードを見る（${issued} 件） ▼`}
+      </Button>
+
+      {open && (
+        <div className="flex max-h-72 flex-col gap-1 overflow-y-auto">
+          {pending && !rows && <p className="text-[12px] text-ink-45">読み込んでいます…</p>}
+          {rows?.map((row) => (
+            <div
+              key={row.code}
+              className="flex items-center justify-between gap-2 rounded-[7px] bg-ink/7 px-2.5 py-2"
+            >
+              <span
+                className={`font-mono text-[12px] leading-none ${
+                  row.redeemed ? 'text-ink-45 line-through' : 'text-ink'
+                }`}
+              >
+                {row.code}
+              </span>
+              <span
+                className={`flex-none rounded-full px-2 py-1 text-[10.5px] font-bold leading-none ${
+                  row.redeemed ? 'bg-ink/10 text-ink-45' : 'bg-matcha/16 text-matcha'
+                }`}
+              >
+                {row.redeemed ? '使用済' : 'まだ使える'}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }

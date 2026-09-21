@@ -478,6 +478,24 @@ export async function discardTickets(batchId: string): Promise<Result<number>> {
   return ok(rows.length);
 }
 
+export interface TicketRow {
+  code: string;
+  /** 参加者が使い終わっているか。使い終わった券は二度と使えない。 */
+  redeemed: boolean;
+}
+
+/** 券のコードを、使われたかどうかとあわせて一覧する。 */
+export async function listTickets(batchId: string, limit = 500): Promise<TicketRow[]> {
+  const sql = await db();
+  const rows = (await sql`
+    SELECT code, (redeemed_by IS NOT NULL) AS redeemed
+    FROM tickets WHERE batch_id = ${batchId}
+    ORDER BY (redeemed_by IS NOT NULL), created_at, code
+    LIMIT ${limit}
+  `) as { code: string; redeemed: boolean }[];
+  return rows.map((r) => ({ code: String(r.code), redeemed: Boolean(r.redeemed) }));
+}
+
 /** 印刷用に、まだ読み取られていない券コードを取り出す。 */
 export async function listUnredeemedCodes(batchId: string, limit = 500): Promise<string[]> {
   const sql = await db();

@@ -44,7 +44,21 @@ function Charge() {
   const submitted = useRef<Set<string>>(new Set());
 
   const submit = useCallback(
-    (code: string) => {
+    (raw: string) => {
+      // 受付に貼ってある共通 QR を読み取ると、コードの入っていない URL が来る。
+      // それを券コードとして送ると「登録されていません」と出て驚かせるので、
+      // URL だったら中の code だけを取り出し、無ければ何もしない。
+      let code = raw;
+      if (/^https?:\/\//i.test(raw.trim())) {
+        try {
+          const fromUrl = new URL(raw.trim()).searchParams.get('code');
+          if (!fromUrl) return;
+          code = fromUrl;
+        } catch {
+          return;
+        }
+      }
+
       const normalized = code.trim().toUpperCase();
       if (!normalized || submitted.current.has(normalized) || pending) return;
       submitted.current.add(normalized);
@@ -88,7 +102,8 @@ function Charge() {
       <ScreenHeader>
         <Title>ポイントを追加</Title>
         <p className="mt-2 text-[12px] leading-[1.7] text-ink-55">
-          お手持ちの券のQRを読み取ってください。前売券・当日券のどちらも、同じ残高に入ります。
+          お手持ちの券に書かれたコードを入れてください。前売券・当日券のどちらも、同じ残高に入ります。
+          一度使ったコードは、二度は使えません。
         </p>
         {guest && (
           <div className="mt-2.5 flex items-baseline gap-1.5">
@@ -102,18 +117,16 @@ function Charge() {
         {success && <Notice tone="info">{success}</Notice>}
         {error && <Notice tone="danger">{error}</Notice>}
 
-        <Scanner onDetect={submit} disabled={pending} />
-
         <Card>
           <label className="flex flex-col gap-2">
             <span className="text-[11.5px] leading-none tracking-[0.08em] text-ink-55">
-              カメラが使えないときは、券のコードを入力
+              券に書かれたコード
             </span>
             <input
               value={manualCode}
               onChange={(e) => setManualCode(e.target.value)}
               placeholder="SAGA-DAY-XXXXXXXXXX"
-              className={`${inputClass} font-mono`}
+              className={`${inputClass} font-mono text-[17px] tracking-wider`}
               autoCapitalize="characters"
               autoCorrect="off"
               spellCheck={false}
@@ -121,14 +134,23 @@ function Charge() {
             />
           </label>
           <Button
-            tone="gold"
+            tone="go"
             block
             onClick={() => submit(manualCode)}
             disabled={pending || !manualCode.trim()}
           >
-            {pending ? '確認しています…' : 'このコードで追加する'}
+            {pending ? '確認しています…' : 'ポイントを受け取る'}
           </Button>
         </Card>
+
+        <details className="rounded-card border border-hairline bg-card p-4">
+          <summary className="cursor-pointer text-[12.5px] text-ink-55">
+            券に QR が付いている場合は、カメラで読み取れます
+          </summary>
+          <div className="mt-3">
+            <Scanner onDetect={submit} disabled={pending} />
+          </div>
+        </details>
 
         <div className="flex flex-col gap-2.5">
           <div className="text-[11px] leading-none tracking-[0.2em] text-ink-45">読み取り履歴</div>
