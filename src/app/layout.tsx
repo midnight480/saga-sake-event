@@ -5,6 +5,7 @@ import type { Metadata, Viewport } from 'next';
 import { BIZ_UDPGothic, Kaisei_HarunoUmi } from 'next/font/google';
 import { ClerkProvider } from '@clerk/nextjs';
 import { Analytics } from '@vercel/analytics/next';
+import { SpeedInsights } from '@vercel/speed-insights/next';
 import { jaJP } from '@clerk/localizations';
 
 import { InstallHint } from '@/components/InstallHint';
@@ -73,6 +74,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           あとで振り返るために入れている。
         */}
         <Analytics />
+        {/*
+          表示の速さを測る。会場の回線は細く、端末も古いものが混ざるので、
+          どの画面が重いかを実際の来場者の環境で知りたい。
+        */}
+        <SpeedInsights />
       </body>
     </html>
   );
