@@ -330,6 +330,16 @@ export async function setAccepting(
   });
 }
 
+/** 銘柄ごとの受付を止める／再開する（Issue #43）。持ち主の蔵（と主催者）だけ。 */
+export async function setBrandAccepting(itemId: string, accepting: boolean): Promise<ActionResult> {
+  return run(async () => {
+    await requireItemOwner(itemId);
+    const result = await store.setItemAccepting(itemId, accepting);
+    refresh();
+    return result.ok ? { ok: true } : { ok: false, reason: result.reason };
+  });
+}
+
 export async function setRequestStatus(
   requestId: number,
   to: RequestStatus,

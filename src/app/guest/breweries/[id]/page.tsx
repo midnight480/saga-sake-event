@@ -157,16 +157,21 @@ function OrderCard({
   const left = itemAvailableCups(item);
   const need = item.ticketCost * cups;
   const soldOut = left === 0;
+  // 蔵がこの銘柄だけ止めている（Issue #43）。完売とは言い分ける。
+  // 在庫はあるので、しばらくすれば頼めるようになるかもしれない。
+  const paused = !item.accepting;
   const notEnough = need > tickets;
-  const canOrder = !blocked && !soldOut && !notEnough && cups <= left;
+  const canOrder = !blocked && !soldOut && !paused && !notEnough && cups <= left;
 
   const label = soldOut
     ? '完売'
-    : blocked
-      ? blockedReason
-      : notEnough
-        ? `あと ${need - tickets} ポイント 必要です`
-        : `${need} ポイントでリクエスト`;
+    : paused
+      ? 'この銘柄は受付停止中'
+      : blocked
+        ? blockedReason
+        : notEnough
+          ? `あと ${need - tickets} ポイント 必要です`
+          : `${need} ポイントでリクエスト`;
 
   const submit = () => {
     setError(null);
@@ -185,7 +190,7 @@ function OrderCard({
   };
 
   return (
-    <Card className={soldOut ? 'opacity-50' : undefined}>
+    <Card className={soldOut || paused ? 'opacity-50' : undefined}>
       <div className="flex items-start justify-between gap-2.5">
         <div className="flex min-w-0 flex-col gap-1.5">
           <span className="font-display text-[20px] tracking-[0.04em] text-ink">{item.name}</span>
@@ -236,7 +241,7 @@ function OrderCard({
         >
           {pending ? '送信しています…' : label}
         </Button>
-        {notEnough && !soldOut && !blocked && (
+        {notEnough && !soldOut && !paused && !blocked && (
           <Link
             href="/guest/charge"
             className="text-center text-[11.5px] leading-none text-gold underline"

@@ -75,6 +75,11 @@ export interface Item {
   richness: SakeRichness | '';
   /** 甘辛（任意）。空なら出さない。 */
   sweetness: SakeSweetness | '';
+  /**
+   * この銘柄の注文を受けているか（Issue #43）。蔵全体の受付（Brewery.accepting）
+   * とは別に、銘柄ごとに止められる。瓶を開け直している間だけ止める、など。
+   */
+  accepting: boolean;
 }
 
 /**

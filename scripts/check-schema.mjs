@@ -236,6 +236,25 @@ async function main() {
   check('受付停止中の蔵には注文できない', closed.ok === false && closed.reason.includes('受付を停止'), `reason=${closed.reason}`);
   await pool.query(`UPDATE breweries SET accepting = true WHERE id = 'b1'`);
 
+  // 銘柄ごとの受付停止（Issue #43）
+  await pool.query(`UPDATE items SET accepting = false WHERE id = 'i1'`);
+  const itemPaused = await order('u1', 'i1', 1);
+  check(
+    '受付を止めた銘柄には注文できない',
+    itemPaused.ok === false && itemPaused.reason.includes('この銘柄はいま受付を停止'),
+    `reason=${itemPaused.reason}`,
+  );
+  check('断られたときポイントは減っていない（100 のまま）', (await ticketsOf()).tickets === 100);
+  // 蔵ごと止めているときは、蔵の理由を先に出す（どちらも止まっているとき）。
+  await pool.query(`UPDATE breweries SET accepting = false WHERE id = 'b1'`);
+  const both = await order('u1', 'i1', 1);
+  check('蔵も銘柄も止まっていれば、蔵の理由を出す', both.ok === false && both.reason.includes('この蔵は'), `reason=${both.reason}`);
+  await pool.query(`UPDATE breweries SET accepting = true WHERE id = 'b1'`);
+  await pool.query(`UPDATE items SET accepting = true WHERE id = 'i1'`);
+  const resumed = await order('u1', 'i1', 1);
+  check('再開すれば注文できる', resumed.ok === true, JSON.stringify(resumed));
+  await deliver(resumed.request_id);
+
   // 存在しない銘柄
   const missing = await order('u1', 'nope', 1);
   check('存在しない銘柄は断られる', missing.ok === false, `reason=${missing.reason}`);

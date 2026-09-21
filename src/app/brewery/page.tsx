@@ -2,12 +2,14 @@
 
 import { useState, useTransition } from 'react';
 
-import { setAccepting, setRequestStatus } from '@/app/actions';
+import { setAccepting, setBrandAccepting, setRequestStatus } from '@/app/actions';
 import { Button, Card, Empty, Eyebrow, Notice, StatusBadge, Title } from '@/components/ui';
 import {
   STATUS_FLOW,
+  itemAvailableCups,
   minutesSince,
   waitingCount,
+  type Item,
   type OrderRequest,
   type RequestStatus,
 } from '@/lib/domain';
@@ -79,6 +81,8 @@ export default function BreweryQueuePage() {
             いま受付を止めています。参加者の画面には「受付停止中」と出て、注文できません。
           </Notice>
         )}
+
+        {brewery.items.length > 0 && <ItemAccepting items={brewery.items} onRefresh={refresh} />}
       </header>
 
       {error && (
@@ -106,6 +110,85 @@ export default function BreweryQueuePage() {
         )}
       </div>
     </>
+  );
+}
+
+/**
+ * 銘柄ごとの受付（Issue #43）。
+ *
+ * 蔵全体を止めるほどではないが、この銘柄だけ止めたい、という場面がある
+ * （瓶を開け直している、冷やし直している、など）。止めても、すでに受けた
+ * 注文はそのまま渡せる。受付キューが主役の画面なので、一覧は開いたときだけ
+ * 出す。止めている銘柄があれば、閉じていても分かるようにしておく。
+ */
+function ItemAccepting({ items, onRefresh }: { items: Item[]; onRefresh: () => Promise<unknown> }) {
+  const [open, setOpen] = useState(false);
+  const paused = items.filter((i) => !i.accepting);
+
+  return (
+    <div className="flex flex-col gap-2">
+      {paused.length > 0 && (
+        <Notice tone="warn">
+          {paused.map((i) => i.name).join('、')} の受付を止めています。
+        </Notice>
+      )}
+
+      {open && (
+        <div className="flex flex-col gap-1.5">
+          {items.map((item) => (
+            <ItemAcceptingRow key={item.id} item={item} onRefresh={onRefresh} />
+          ))}
+        </div>
+      )}
+
+      <Button tone="flat" block onClick={() => setOpen((v) => !v)} aria-expanded={open}>
+        {open ? '銘柄ごとの受付をとじる ▲' : '銘柄ごとに受付を止める ▼'}
+      </Button>
+    </div>
+  );
+}
+
+function ItemAcceptingRow({ item, onRefresh }: { item: Item; onRefresh: () => Promise<unknown> }) {
+  const [pending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+  const soldOut = itemAvailableCups(item) === 0;
+
+  const toggle = () => {
+    setError(null);
+    startTransition(async () => {
+      const result = await setBrandAccepting(item.id, !item.accepting);
+      if (!result.ok) setError(result.reason);
+      await onRefresh();
+    });
+  };
+
+  return (
+    <div
+      className={`flex flex-col gap-2 rounded-field border px-3.5 py-2.5 ${
+        item.accepting ? 'border-hairline bg-card' : 'border-amber/50 bg-amber/10'
+      }`}
+    >
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex min-w-0 flex-col gap-1">
+          <span className="truncate text-[13.5px] leading-snug text-ink">{item.name}</span>
+          <span
+            className={`text-[11px] leading-none ${item.accepting ? 'text-matcha' : 'text-amber'}`}
+          >
+            {item.accepting ? '受付中' : '受付停止中'}
+            {soldOut && <span className="text-ink-45"> ・ 完売</span>}
+          </span>
+        </div>
+        <Button
+          tone={item.accepting ? 'ghost' : 'go'}
+          className="flex-none"
+          onClick={toggle}
+          disabled={pending}
+        >
+          {pending ? '…' : item.accepting ? '止める' : '再開する'}
+        </Button>
+      </div>
+      {error && <Notice tone="danger">{error}</Notice>}
+    </div>
   );
 }
 

@@ -276,6 +276,10 @@ function ItemCard({ item }: { item: Item }) {
           <span className="text-[11px] leading-none text-ink-45">
             {item.kind} / 精米 {item.polish}%
           </span>
+          {/* 受付キューで止めた銘柄（Issue #43）。ここで本数を触る人にも分かるように。 */}
+          {!item.accepting && (
+            <span className="text-[11px] leading-none text-amber">受付停止中（受付キューで再開）</span>
+          )}
         </div>
         <div className="flex flex-none items-center gap-2">
           <span className="rounded-full border border-gold/40 px-2.5 py-1.5 text-[11px] leading-none text-gold">

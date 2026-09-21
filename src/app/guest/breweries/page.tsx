@@ -65,14 +65,15 @@ export default function GuestBreweryListPage() {
 function canOrderHere(brewery: Brewery, tickets: number): boolean {
   if (!brewery.accepting) return false;
   return brewery.items.some(
-    (item) => itemAvailableCups(item) > 0 && item.ticketCost <= tickets,
+    (item) => item.accepting && itemAvailableCups(item) > 0 && item.ticketCost <= tickets,
   );
 }
 
 /** この蔵で頼める中で、いちばん安い 1 杯の枚数。頼めるものが無ければ null。 */
 function cheapestCost(brewery: Brewery): number | null {
+  // 受付を止めている銘柄（Issue #43）は、いま頼めないので数えない。
   const costs = brewery.items
-    .filter((item) => itemAvailableCups(item) > 0)
+    .filter((item) => item.accepting && itemAvailableCups(item) > 0)
     .map((item) => item.ticketCost);
   return costs.length > 0 ? Math.min(...costs) : null;
 }
@@ -140,7 +141,7 @@ function BreweryRow({
             <div className="flex w-full flex-col gap-1.5">
               {brewery.items.map((item) => {
                 const left = itemAvailableCups(item);
-                const enough = left > 0 && item.ticketCost <= tickets;
+                const enough = item.accepting && left > 0 && item.ticketCost <= tickets;
                 return (
                   <div
                     key={item.id}
@@ -157,8 +158,16 @@ function BreweryRow({
                       <span className={enough ? 'font-bold text-gold' : 'text-ink-45'}>
                         {item.ticketCost} ポイント
                       </span>
-                      <span className={left === 0 ? 'text-terracotta-soft' : 'text-ink-45'}>
-                        {left === 0 ? '完売' : `残${left}`}
+                      <span
+                        className={
+                          left === 0
+                            ? 'text-terracotta-soft'
+                            : !item.accepting
+                              ? 'text-amber'
+                              : 'text-ink-45'
+                        }
+                      >
+                        {left === 0 ? '完売' : !item.accepting ? '停止中' : `残${left}`}
                       </span>
                     </span>
                   </div>
