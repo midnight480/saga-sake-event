@@ -150,9 +150,12 @@ function BatchCard({ batch }: { batch: TicketBatch }) {
       <div className="flex flex-col gap-2 border-t border-hairline pt-3">
         <Field
           label="この券 1 枚で、チケット何枚分にするか"
+          // 変えられないときだけ、その理由を出す。
+          // 変えられるときの補足（「1 杯あたり 1〜3 枚です」など）は、
+          // 別の数の話が混ざって分かりにくくなるので出さない。
           hint={
             canChangeCups
-              ? '1 杯あたり 1〜3 枚です。'
+              ? undefined
               : 'すでに発行した券があるため変更できません。変えるには、下の「発行した券を取り消す」で 0 枚に戻してください。'
           }
         >
