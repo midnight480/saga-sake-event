@@ -253,6 +253,28 @@ export const STATEMENTS: string[] = [
   `CREATE INDEX IF NOT EXISTS inquiries_from_idx
      ON inquiries (from_clerk_id, created_at DESC)`,
 
+  // ── お知らせの宛先。端末ごとに 1 行。──
+  `CREATE TABLE IF NOT EXISTS push_subscriptions (
+     endpoint      text PRIMARY KEY,
+     clerk_user_id text        NOT NULL,
+     role          text        NOT NULL DEFAULT 'guest',
+     p256dh        text        NOT NULL,
+     auth          text        NOT NULL,
+     created_at    timestamptz NOT NULL DEFAULT now(),
+     failed_at     timestamptz
+   )`,
+  `CREATE INDEX IF NOT EXISTS push_subscriptions_user_idx
+     ON push_subscriptions (clerk_user_id)`,
+
+  // ── 送り終えた節目の記録。
+  //    同じ節目を二度 送らないための鍵。開催日ごとに 1 回だけ。──
+  `CREATE TABLE IF NOT EXISTS sent_notices (
+     event_date date NOT NULL,
+     milestone  text NOT NULL,
+     sent_at    timestamptz NOT NULL DEFAULT now(),
+     PRIMARY KEY (event_date, milestone)
+   )`,
+
   // ── 内部メモ（スキーマ版数など）──
   `CREATE TABLE IF NOT EXISTS app_meta (
      key   text PRIMARY KEY,

@@ -6,6 +6,7 @@ import { BIZ_UDPGothic, Kaisei_HarunoUmi } from 'next/font/google';
 import { ClerkProvider } from '@clerk/nextjs';
 import { jaJP } from '@clerk/localizations';
 
+import { InstallHint } from '@/components/InstallHint';
 import { clerkKeys, hasClerk } from '@/lib/auth';
 import './globals.css';
 
@@ -46,7 +47,10 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   const content = (
     <html lang="ja" className={`${body.variable} ${display.variable}`}>
-      <body>{children}</body>
+      <body>
+        {children}
+        <InstallHint />
+      </body>
     </html>
   );
 

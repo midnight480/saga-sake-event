@@ -23,6 +23,14 @@ export async function GET() {
     // 参加者の残高を混ぜて返すのは、本人がログインしているときだけ。
     const snapshot = await getSnapshot(viewer?.role === 'guest' ? viewer.userId : undefined);
 
+    // 節目を過ぎていればお知らせを送る。cron を使わずに済ませるため、
+    // 画面が現在値を取りに来るこの機会に確かめている。送った記録は
+    // 開催日と節目の組で 1 行しか作れないので、二重には送られない。
+    // 応答は待たせない（お知らせのために画面が遅くなるのは本末転倒）。
+    void import('@/lib/push').then(({ sendDueNotices }) =>
+      sendDueNotices(snapshot.event, new Date(snapshot.serverTime)).catch(() => {}),
+    );
+
     return NextResponse.json(snapshot, { headers: { 'Cache-Control': 'no-store' } });
   } catch (error) {
     return NextResponse.json(

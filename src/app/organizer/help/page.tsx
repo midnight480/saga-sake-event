@@ -1,5 +1,6 @@
 import { Eyebrow, ScreenHeader, Title } from '@/components/ui';
 import { HelpNote, HelpSection, HelpSteps, HelpText, HelpTroubles } from '@/components/Help';
+import { PushSettings } from '@/components/PushSettings';
 
 export default function OrganizerHelpPage() {
   return (
@@ -8,6 +9,8 @@ export default function OrganizerHelpPage() {
         <Eyebrow>HELP</Eyebrow>
         <Title>主催者の使い方</Title>
       </ScreenHeader>
+
+      <PushSettings />
 
       <HelpSection title="当日までに、この順で">
         <HelpSteps

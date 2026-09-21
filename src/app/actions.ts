@@ -499,6 +499,43 @@ export async function replyToInquiry(id: number, answer: string): Promise<Action
   });
 }
 
+// ═════════════════════════════════════════════════════════════
+// お知らせ（Web Push）
+// ═════════════════════════════════════════════════════════════
+
+/** ブラウザに渡す公開鍵。無ければその場で作られる。 */
+export async function getPushPublicKey(): Promise<ActionResult<string>> {
+  return run(async () => {
+    await requireViewer();
+    const { vapidPublicKey } = await import('@/lib/push');
+    return { ok: true, value: await vapidPublicKey() };
+  });
+}
+
+/** この端末にお知らせを送ってよい、と登録する。 */
+export async function subscribeToPush(input: {
+  endpoint: string;
+  p256dh: string;
+  auth: string;
+}): Promise<ActionResult> {
+  return run(async () => {
+    const viewer = await requireViewer();
+    const { saveSubscription } = await import('@/lib/push');
+    await saveSubscription({ ...input, clerkUserId: viewer.userId, role: viewer.role });
+    return { ok: true };
+  });
+}
+
+/** 受け取りをやめる。 */
+export async function unsubscribeFromPush(endpoint: string): Promise<ActionResult> {
+  return run(async () => {
+    await requireViewer();
+    const { removeSubscription } = await import('@/lib/push');
+    await removeSubscription(endpoint);
+    return { ok: true };
+  });
+}
+
 /** 参加者としてログインした直後に、台帳と役割メタデータを整える。 */
 export async function ensureGuestRegistered(): Promise<ActionResult<{ kindChosen: boolean }>> {
   return run(async () => {
