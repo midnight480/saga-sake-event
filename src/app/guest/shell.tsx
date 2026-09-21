@@ -1,8 +1,21 @@
 'use client';
 
-import { AppShell, type Tab } from '@/components/AppShell';
+import { AppShell, type LogoutOptions, type Tab } from '@/components/AppShell';
 import { orderingStatus } from '@/lib/domain';
 import { useSnapshot } from '@/lib/useSnapshot';
+
+/** 参加者のポイントと記録は、アカウント（メールアドレス）に結びついて残る。 */
+const LOGOUT: LogoutOptions = {
+  redirectUrl: '/',
+  note: (
+    <>
+      ポイントの残りと、これまでの記録は消えません。
+      <br />
+      もう一度<strong className="text-ink">同じメールアドレス</strong>でログインすると、
+      続きから使えます。
+    </>
+  ),
+};
 
 const TABS: Tab[] = [
   { href: '/guest', label: 'マイページ', icon: '◉' },
@@ -26,6 +39,7 @@ export function GuestShell({ children }: { children: React.ReactNode }) {
       }
       tabs={TABS}
       stale={isStale}
+      logout={LOGOUT}
     >
       {children}
     </AppShell>

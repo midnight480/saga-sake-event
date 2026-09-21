@@ -1,9 +1,11 @@
 'use client';
 
+import { useClerk } from '@clerk/nextjs';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 
+import { ConfirmDialog } from '@/components/ui';
 import type { OrderingStatus } from '@/lib/domain';
 
 export interface Tab {
@@ -12,6 +14,12 @@ export interface Tab {
   icon: string;
   /** 手当てが要る件数。0 のときは出さない。 */
   badge?: number;
+}
+
+/** ログアウトしたあとの行き先と、確認の画面に添える一言。 */
+export interface LogoutOptions {
+  redirectUrl: string;
+  note: ReactNode;
 }
 
 /**
@@ -28,6 +36,7 @@ export function AppShell({
   status,
   tabs,
   stale,
+  logout,
   children,
 }: {
   role: string;
@@ -36,6 +45,7 @@ export function AppShell({
   status?: OrderingStatus;
   tabs: Tab[];
   stale?: boolean;
+  logout: LogoutOptions;
   children: ReactNode;
 }) {
   const pathname = usePathname();
@@ -79,7 +89,9 @@ export function AppShell({
                 key={tab.href}
                 href={tab.href}
                 aria-current={active ? 'page' : undefined}
-                className={`flex min-h-12 flex-1 flex-col items-center justify-center gap-1 ${
+                // min-w-0 が要る。無いと flex の子は中身より縮まず、長い名前の
+                // タブがあるとメニューごと右にはみ出す（truncate が効かない）。
+                className={`flex min-h-12 min-w-0 flex-1 flex-col items-center justify-center gap-1 ${
                   active ? 'text-gold-bright' : 'text-ink-45'
                 }`}
               >
@@ -97,9 +109,59 @@ export function AppShell({
               </Link>
             );
           })}
+          <LogoutTab {...logout} />
         </nav>
       </div>
     </div>
+  );
+}
+
+/**
+ * ログアウト。メニューのいちばん右に置く（Issue #31）。
+ *
+ * 押し間違えると入り直しに手間がかかる（蔵は蔵ID とパスワードが要る）ので、
+ * 必ず確認を挟む。画面を切り替えるタブと見た目はそろえるが、中身はボタン。
+ */
+function LogoutTab({ redirectUrl, note }: LogoutOptions) {
+  const { signOut } = useClerk();
+  const [confirming, setConfirming] = useState(false);
+  const [pending, setPending] = useState(false);
+
+  const run = async () => {
+    setPending(true);
+    try {
+      await signOut({ redirectUrl });
+    } catch {
+      // 通信が切れていた、など。画面に留めて、もう一度押せるようにする。
+      setPending(false);
+      setConfirming(false);
+    }
+  };
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setConfirming(true)}
+        className="flex min-h-12 min-w-0 flex-1 flex-col items-center justify-center gap-1 text-ink-45 hover:text-ink"
+      >
+        <span aria-hidden className="text-[17px] leading-none">
+          ↩
+        </span>
+        <span className="max-w-full truncate px-0.5 text-[10.5px] leading-none">ログアウト</span>
+      </button>
+
+      <ConfirmDialog
+        open={confirming}
+        title="ログアウトしますか"
+        confirmLabel="はい、ログアウトします"
+        onConfirm={run}
+        onCancel={() => setConfirming(false)}
+        pending={pending}
+      >
+        {note}
+      </ConfirmDialog>
+    </>
   );
 }
 

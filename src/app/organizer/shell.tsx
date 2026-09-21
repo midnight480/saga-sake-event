@@ -1,11 +1,23 @@
 'use client';
 
-import { AppShell, type Tab } from '@/components/AppShell';
+import { AppShell, type LogoutOptions, type Tab } from '@/components/AppShell';
 import { orderingStatus } from '@/lib/domain';
 import { useSnapshot } from '@/lib/useSnapshot';
 
+/** 主催者がログアウトしても、イベントのデータには何も起きない。 */
+const LOGOUT: LogoutOptions = {
+  redirectUrl: '/',
+  note: (
+    <>
+      イベントの設定や注文、券のデータは消えません。
+      <br />
+      もう一度同じメールアドレスでログインすると、続きから使えます。
+    </>
+  ),
+};
+
 const TABS: Tab[] = [
-  // タブが 5 つ並ぶので、狭い端末でも収まる長さにしている。
+  // ログアウトを含めて 7 つ並ぶので、狭い端末でも収まる長さにしている。
   { href: '/organizer', label: '運営状況', icon: '◱' },
   { href: '/organizer/event', label: '設定', icon: '⚙' },
   { href: '/organizer/breweries', label: '酒蔵', icon: '◈' },
@@ -33,6 +45,7 @@ export function OrganizerShell({ children }: { children: React.ReactNode }) {
       }
       tabs={tabs}
       stale={isStale}
+      logout={LOGOUT}
     >
       {children}
     </AppShell>
