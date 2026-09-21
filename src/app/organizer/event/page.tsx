@@ -2,7 +2,14 @@
 
 import { useEffect, useState, useTransition } from 'react';
 
-import { discardAllTickets, resetEvent, saveEvent, setCupsPerTicket, setPhase } from '@/app/actions';
+import {
+  discardAllTickets,
+  resetEvent,
+  saveEvent,
+  seedRehearsalData,
+  setCupsPerTicket,
+  setPhase,
+} from '@/app/actions';
 import {
   Button,
   Card,
@@ -234,6 +241,11 @@ export default function EventSettingsPage() {
         </div>
       </div>
 
+      <SectionLabel>予行演習</SectionLabel>
+      <div className="px-5 pb-2">
+        <Rehearsal />
+      </div>
+
       <SectionLabel>新しいイベントを始める</SectionLabel>
       <div className="px-5 pb-7">
         <ResetEvent />
@@ -427,6 +439,114 @@ function TicketPlan({ batch }: { batch: TicketBatch }) {
         <br />
         <br />
         すでに渡したポイントは戻りません（もう召し上がったぶんまで取り上げないためです）。
+      </ConfirmDialog>
+    </Card>
+  );
+}
+
+/**
+ * 予行演習用のデータを入れる。
+ *
+ * 空の画面を眺めても、混雑の色や在庫のバー、応答遅延の警告がどう出るかは
+ * 分からない。当日と同じ形のデータを一度に入れて、目で確かめられるようにする。
+ */
+function Rehearsal() {
+  const { snapshot, refresh } = useSnapshot();
+  const [confirming, setConfirming] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [result, setResult] = useState<
+    { name: string; loginId: string; password: string; accountReady: boolean }[] | null
+  >(null);
+  const [summary, setSummary] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+
+  const already = (snapshot?.breweries.length ?? 0) > 0;
+
+  const run = () => {
+    setConfirming(false);
+    setError(null);
+    startTransition(async () => {
+      const done = await seedRehearsalData();
+      if (done.ok && done.value) {
+        setResult(done.value.breweries);
+        setSummary(
+          `酒蔵 ${done.value.breweries.length} 蔵、銘柄 ${done.value.items} 件、` +
+            `参加者 ${done.value.guests} 名、注文 ${done.value.orders} 件を入れました。`,
+        );
+      } else if (!done.ok) {
+        setError(done.reason);
+      }
+      await refresh();
+    });
+  };
+
+  return (
+    <Card className="border-gold/35">
+      <Note>
+        実在する佐賀の酒蔵と銘柄で、当日と同じ形のデータを入れます。混雑の色、在庫のバー、
+        応答遅延の警告、受付停止中の表示が、実際にどう出るかを確かめられます。
+      </Note>
+
+      {error && <Notice tone="danger">{error}</Notice>}
+      {summary && <Notice tone="info">{summary}</Notice>}
+
+      {result && (
+        <div className="flex flex-col gap-2">
+          <p className="text-[11.5px] leading-[1.8] text-ink-55">
+            下のIDとパスワードで、蔵の画面にログインして試せます。
+            <strong className="text-gold-bright">この画面を離れると再表示できません。</strong>
+            見失ったら「蔵アカウント」で再発行してください。
+          </p>
+          {result.map((b) => (
+            <div
+              key={b.loginId}
+              className="flex flex-col gap-1 rounded-field border border-gold/40 bg-gold/10 p-3"
+            >
+              <span className="text-[12.5px] font-bold text-ink">{b.name}</span>
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-mono text-[13px] text-ink">{b.loginId}</span>
+                <span className="font-mono text-[13px] font-bold text-gold">{b.password}</span>
+              </div>
+              {!b.accountReady && (
+                <span className="text-[11px] text-terracotta-soft">
+                  ログインアカウントを作れませんでした。「蔵アカウント」から作成してください。
+                </span>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {!result && (
+        <Button tone="gold" block onClick={() => setConfirming(true)} disabled={pending}>
+          {pending ? '入れています…' : '予行演習用のデータを入れる'}
+        </Button>
+      )}
+
+      <ConfirmDialog
+        open={confirming}
+        title="予行演習用のデータを入れますか"
+        confirmLabel="はい、入れます"
+        onConfirm={run}
+        onCancel={() => setConfirming(false)}
+        pending={pending}
+      >
+        実在する佐賀の酒蔵 3 蔵と、その銘柄 9 件、参加者 3 名、注文 9 件を作ります。
+        蔵のログインアカウントも本番と同じ手順で作られます。
+        {already && (
+          <>
+            <br />
+            <br />
+            <span className="text-terracotta-soft">
+              すでに {snapshot?.breweries.length} 蔵が登録されています。
+              予行演習の蔵はそこに追加されます。まっさらにしてから入れたい場合は、
+              先に「前回の記録を片付ける」を実行してください。
+            </span>
+          </>
+        )}
+        <br />
+        <br />
+        本番のイベントでは実行しないでください。参加者や注文が混ざります。
       </ConfirmDialog>
     </Card>
   );

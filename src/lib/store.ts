@@ -824,6 +824,99 @@ export async function resetEvent(): Promise<Result<ResetCounts>> {
 }
 
 // ─────────────────────────────────────────────────────────────
+// 予行演習用のデータ投入
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * 蔵に銘柄をまとめて入れる。
+ *
+ * 通常の登録と同じ列を埋める。予行演習でも本番と同じ形にしておかないと、
+ * 画面の見え方を確かめる意味が無い。
+ */
+export async function seedItems(
+  breweryId: string,
+  items: {
+    name: string;
+    kind: string;
+    polish: number;
+    size: BottleSize;
+    ticketCost: number;
+    bottles: number;
+    poured: number;
+  }[],
+): Promise<string[]> {
+  const sql = await db();
+  const ids: string[] = [];
+
+  for (const item of items) {
+    const id = `item_${randomInt(1e9).toString(36)}${Date.now().toString(36)}`;
+    const cupsPerBottle = CUPS_PER_BOTTLE[item.size] ?? 6;
+    // 出した杯数が持ち込みを超えないようにする。
+    const poured = Math.min(item.poured, item.bottles * cupsPerBottle);
+
+    await sql`
+      INSERT INTO items
+        (id, brewery_id, name, kind, polish, size, cups_per_bottle, bottles, used_cups, ticket_cost)
+      VALUES (${id}, ${breweryId}, ${item.name}, ${item.kind}, ${item.polish}, ${item.size},
+              ${cupsPerBottle}, ${item.bottles}, ${poured}, ${item.ticketCost})
+    `;
+    ids.push(id);
+  }
+  return ids;
+}
+
+/** 予行演習用の参加者。Clerk のアカウントは作らない。 */
+export async function seedGuest(
+  clerkUserId: string,
+  displayNo: string,
+  points: number,
+): Promise<void> {
+  const sql = await db();
+  await sql`
+    INSERT INTO guests (clerk_user_id, display_no, tickets, used)
+    VALUES (${clerkUserId}, ${displayNo}, ${points}, 0)
+    ON CONFLICT (clerk_user_id) DO UPDATE SET display_no = EXCLUDED.display_no,
+                                              tickets = EXCLUDED.tickets,
+                                              used = 0
+  `;
+}
+
+/**
+ * 予行演習用の注文。
+ *
+ * 受けた時刻をずらして入れる。全部「いま」にすると、蔵の画面で「◯分前」が
+ * 全部 0 分になり、応答遅延の警告も出ない。
+ */
+export async function seedRequest(input: {
+  guestClerkId: string;
+  guestLabel: string;
+  breweryId: string;
+  itemId: string;
+  brand: string;
+  cups: number;
+  ticketCost: number;
+  status: RequestStatus;
+  minutesAgo: number;
+}): Promise<void> {
+  const sql = await db();
+  await sql`
+    INSERT INTO requests
+      (guest_clerk_id, guest_label, brewery_id, item_id, brand, cups, ticket_cost,
+       status, created_at, updated_at)
+    VALUES (${input.guestClerkId}, ${input.guestLabel}, ${input.breweryId}, ${input.itemId},
+            ${input.brand}, ${input.cups}, ${input.ticketCost}, ${input.status},
+            now() - make_interval(mins => ${input.minutesAgo}),
+            now() - make_interval(mins => ${input.minutesAgo}))
+  `;
+  // 使ったポイントを参加者側にも反映する。画面の残高と注文が食い違わないように。
+  await sql`
+    UPDATE guests SET tickets = GREATEST(0, tickets - ${input.ticketCost}),
+                      used = used + ${input.ticketCost}
+    WHERE clerk_user_id = ${input.guestClerkId}
+  `;
+}
+
+// ─────────────────────────────────────────────────────────────
 // 問い合わせ
 // ─────────────────────────────────────────────────────────────
 
