@@ -7,7 +7,6 @@ import {
   AddBox,
   Button,
   Card,
-  Chip,
   Empty,
   Eyebrow,
   Note,
@@ -20,6 +19,7 @@ import {
 } from '@/components/ui';
 import {
   CUPS_PER_BOTTLE,
+  MAX_TICKET_COST,
   SAKE_KINDS,
   itemCupsLeft,
   itemTotalCups,
@@ -146,22 +146,21 @@ export default function BreweryStockPage() {
             ))}
           </div>
 
-          <div className="flex items-center gap-2.5 border-t border-hairline pt-3">
-            <span className="flex-none text-[11.5px] leading-[1.5] text-ink-55">
-              1杯あたり
-              <br />
-              チケット
+          <div className="flex flex-col gap-2 border-t border-hairline pt-3">
+            <span className="text-[11.5px] leading-none text-ink-55">
+              1 杯 いただくのに、チケット何枚 使うか
             </span>
-            {[1, 2, 3].map((c) => (
-              <Chip
-                key={c}
-                active={ticketCost === c}
-                className="flex-1"
-                onClick={() => setTicketCost(c)}
-              >
-                {c}枚
-              </Chip>
-            ))}
+            <div className="rounded-field border border-hairline-strong bg-card px-3.5 py-2">
+              <Stepper
+                label="1杯あたりのチケット枚数"
+                unit="枚"
+                value={ticketCost}
+                onDecrease={() => setTicketCost((v) => Math.max(1, v - 1))}
+                onIncrease={() => setTicketCost((v) => Math.min(MAX_TICKET_COST, v + 1))}
+                decreaseDisabled={ticketCost <= 1}
+                increaseDisabled={ticketCost >= MAX_TICKET_COST}
+              />
+            </div>
           </div>
 
           <Note>
@@ -259,20 +258,23 @@ function ItemCard({ item }: { item: Item }) {
         increaseDisabled={pending}
       />
 
-      <div className="flex items-center gap-2.5 border-t border-hairline pt-3">
-        <span className="flex-none text-[11.5px] leading-none whitespace-nowrap text-ink-55">
-          1杯あたり
+      <div className="flex flex-col gap-2 border-t border-hairline pt-3">
+        <span className="text-[11.5px] leading-none text-ink-55">
+          1 杯 いただくのに、チケット何枚 使うか
         </span>
-        {[1, 2, 3].map((c) => (
-          <Chip
-            key={c}
-            active={item.ticketCost === c}
-            className="flex-1"
-            onClick={() => act(() => setTicketCost(item.id, c))}
-          >
-            {c}枚
-          </Chip>
-        ))}
+        <div className="rounded-field border border-hairline-strong bg-card px-3.5 py-2">
+          <Stepper
+            label="1杯あたりのチケット枚数"
+            unit="枚"
+            value={item.ticketCost}
+            onDecrease={() => act(() => setTicketCost(item.id, Math.max(1, item.ticketCost - 1)))}
+            onIncrease={() =>
+              act(() => setTicketCost(item.id, Math.min(MAX_TICKET_COST, item.ticketCost + 1)))
+            }
+            decreaseDisabled={pending || item.ticketCost <= 1}
+            increaseDisabled={pending || item.ticketCost >= MAX_TICKET_COST}
+          />
+        </div>
       </div>
 
       <div className="flex justify-between border-t border-hairline pt-2.5 text-[12px] leading-none">

@@ -197,8 +197,14 @@ export const INITIAL_TICKETS: Record<GuestKind, number> = {
   酒蔵特別枠: 15,
 };
 
-/** 1 杯に使えるチケットの上限（＝一度に頼める杯数の上限）。 */
+/** 一度に頼める杯数の上限。 */
 export const MAX_CUPS_PER_REQUEST = 3;
+
+/**
+ * 1 杯あたりに設定できるチケット枚数の上限。
+ * 銘柄の値付けは蔵が決めるものなので、こちらで 3 枚までと決め打ちしない。
+ */
+export const MAX_TICKET_COST = 20;
 
 /** 蔵が応答しないまま何分経ったら主催者に警告を出すか。 */
 export const STALE_REQUEST_MINUTES = 12;

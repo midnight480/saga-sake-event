@@ -243,6 +243,12 @@ export const SEED_STATEMENTS: string[] = [
      ('same-day', '当日券', 'SAGA-DAY', true, 10, '会場で販売する券', 1)
    ON CONFLICT (id) DO NOTHING`,
 
+  // 1 杯あたりのチケット枚数の上限を広げた分の移行。
+  // 銘柄の値付けは蔵が決めるので、3 枚までという決め打ちをやめた。
+  `ALTER TABLE items DROP CONSTRAINT IF EXISTS items_ticket_cost_range`,
+  `ALTER TABLE items ADD CONSTRAINT items_ticket_cost_range
+     CHECK (ticket_cost BETWEEN 1 AND 20)`,
+
   // 受付の開け閉めを「予定どおり（auto）」を既定に変えた分の移行。
   // 既存の表には古い CHECK と DEFAULT が残っているので、貼り替える。
   `ALTER TABLE events ALTER COLUMN phase SET DEFAULT 'auto'`,

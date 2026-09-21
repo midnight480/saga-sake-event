@@ -198,11 +198,9 @@ export async function createBrewery(input: {
   const loginId = await nextLoginId();
   const password = generatePassword();
 
-  // 空いているブースを 1 つ自動で割り当てる（未割当なら空欄のまま）。
-  const taken = (await sql`SELECT booth FROM breweries`) as { booth: string }[];
-  const used = new Set(taken.map((t) => t.booth));
-  const { BOOTHS } = await import('./domain');
-  const booth = BOOTHS.find((b) => !used.has(b)) ?? '';
+  // ブース番号は割り当てない。主催者が画面から変えられない番号を配ると、
+  // 実際の配置と食い違ったまま来場者を別の場所へ案内してしまう。
+  const booth = '';
 
   await sql`
     INSERT INTO breweries (id, name, area, booth, login_id, sort_order)
@@ -271,7 +269,10 @@ export async function addItem(
 ): Promise<Result<{ id: string }>> {
   const name = input.name.trim();
   if (!name) return fail('銘柄名を入力してください。');
-  if (input.ticketCost < 1 || input.ticketCost > 3) return fail('チケット枚数は 1〜3 です。');
+  const { MAX_TICKET_COST } = await import('./domain');
+  if (input.ticketCost < 1 || input.ticketCost > MAX_TICKET_COST) {
+    return fail(`チケット枚数は 1〜${MAX_TICKET_COST} です。`);
+  }
 
   const sql = await db();
   const id = `item_${randomInt(1e9).toString(36)}${Date.now().toString(36)}`;
@@ -310,7 +311,10 @@ export async function changeBottles(itemId: string, delta: number): Promise<Resu
 }
 
 export async function setItemTicketCost(itemId: string, ticketCost: number): Promise<Result> {
-  if (ticketCost < 1 || ticketCost > 3) return fail('チケット枚数は 1〜3 です。');
+  const { MAX_TICKET_COST } = await import('./domain');
+  if (ticketCost < 1 || ticketCost > MAX_TICKET_COST) {
+    return fail(`チケット枚数は 1〜${MAX_TICKET_COST} です。`);
+  }
   const sql = await db();
   const rows = (await sql`
     UPDATE items SET ticket_cost = ${ticketCost} WHERE id = ${itemId} RETURNING id
