@@ -45,6 +45,9 @@ export const STATEMENTS: string[] = [
      created_at    timestamptz NOT NULL DEFAULT now()
    )`,
   `CREATE INDEX IF NOT EXISTS breweries_sort_idx ON breweries (sort_order, created_at)`,
+  // 役割の判定で毎回引くので索引を張る。
+  `CREATE INDEX IF NOT EXISTS breweries_clerk_user_idx
+     ON breweries (clerk_user_id) WHERE clerk_user_id IS NOT NULL`,
 
   // ── 銘柄（蔵が持ち込むお酒）──
   `CREATE TABLE IF NOT EXISTS items (

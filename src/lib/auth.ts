@@ -71,17 +71,15 @@ export function organizerEmailAllowlist(): string[] {
 export async function getViewer(): Promise<Viewer | null> {
   if (!hasClerk()) return null;
 
-  const { userId, sessionClaims } = await auth();
+  const { userId } = await auth();
   if (!userId) return null;
 
-  // 蔵アカウントは publicMetadata だけで判定できる（DB を見に行かない）。
-  const meta = (sessionClaims?.publicMetadata ?? {}) as {
-    role?: string;
-    breweryId?: string;
-  };
-  if (meta.role === 'brewery' && meta.breweryId) {
-    return { userId, role: 'brewery', breweryId: meta.breweryId };
-  }
+  // ★ セッションのトークンに publicMetadata は載っていない ★
+  // Clerk は既定でそれをトークンに含めないので、そこから役割を読もうとすると
+  // 常に空になり、蔵の担当者が参加者として扱われてしまう（実際に起きた）。
+  // DB を正として引く。Clerk 側の設定に左右されないし、索引一本で済む。
+  const breweryId = await findBreweryForUser(userId);
+  if (breweryId) return { userId, role: 'brewery', breweryId };
 
   const user = await currentUser();
   const email = user?.primaryEmailAddress?.emailAddress?.toLowerCase();
@@ -91,6 +89,30 @@ export async function getViewer(): Promise<Viewer | null> {
   }
 
   return { userId, role: 'guest', email };
+}
+
+/**
+ * その人が担当する蔵。
+ *
+ * ★ store.ts を呼ばずに、ここで SQL を書いている ★
+ * このファイルはミドルウェア（Edge ランタイム）からも読み込まれる。
+ * store.ts は node:crypto を使うので、取り込むとビルドが壊れる。
+ * 一文で済む問い合わせなので、依存を増やさずここに置く。
+ *
+ * DB が落ちていても画面は出したいので、失敗したら黙って null を返す。
+ */
+async function findBreweryForUser(userId: string): Promise<string | null> {
+  if (!hasDatabase()) return null;
+  try {
+    await ensureSchema();
+    const sql = getSql();
+    const rows = (await sql`
+      SELECT id FROM breweries WHERE clerk_user_id = ${userId} LIMIT 1
+    `) as { id: string }[];
+    return rows[0]?.id ?? null;
+  } catch {
+    return null;
+  }
 }
 
 /**
