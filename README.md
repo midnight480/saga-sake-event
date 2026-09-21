@@ -172,6 +172,128 @@ npm run verify:sql  # 実際の Postgres に対する検証
 - 設計の全体像と判断の理由 → **[DESIGN.md](DESIGN.md)**
 - 作業するときの決まり → **[AGENTS.md](AGENTS.md)**
 
+### システムの構成
+
+サーバーを常駐させず、WebSocket も使わない。**3 つの役割の画面が同じ口
+（`/api/snapshot`）を 4 秒ごとに読みに行き、同じ数字を見る**という形にしている。
+追加の契約も設定も増やさずに、どの端末でも動かすため。
+
+```mermaid
+flowchart TB
+  subgraph phone["スマートフォン ─ 主催者 / 酒蔵 / 参加者"]
+    ui["画面"]
+    sw["Service Worker<br/>通知の受け取りだけ。ページは保存しない"]
+  end
+
+  mw["middleware.ts<br/>clerkMiddleware（Edge）"]
+
+  subgraph app["Vercel ─ Next.js App Router"]
+    act["app/actions.ts<br/>Server Actions ─ 権限確認はここに集約"]
+    snap["GET /api/snapshot<br/>会場のいまを 1 回で返す"]
+    qr["GET /api/qr<br/>受付に貼る QR"]
+    auth["lib/auth.ts ─ 役割の判定"]
+    store["lib/store.ts ─ DB の読み書き"]
+    push["lib/push.ts ─ 節目のお知らせ"]
+    domain["lib/domain.ts<br/>型と計算式。何にも依存しない"]
+  end
+
+  clerk["Clerk<br/>ログインと本人確認"]
+  neon["Neon Postgres<br/>events / breweries / items /<br/>requests / tickets / guests"]
+  relay["ブラウザの通知配信サービス"]
+
+  ui -->|"操作"| mw
+  ui -->|"4 秒ごとに読みに行く"| mw
+  mw --> act
+  mw --> snap
+  mw --> qr
+  mw -->|"セッションの確認"| clerk
+
+  act --> auth
+  act --> store
+  snap --> auth
+  snap --> store
+  snap -->|"節目を過ぎていたら"| push
+
+  auth --> clerk
+  auth -->|"役割は DB を正とする"| neon
+  store --> neon
+  push -->|"VAPID 鍵を保存／取得"| neon
+  push -->|"Web Push"| relay
+  relay --> sw
+  sw -->|"通知をタップ"| ui
+
+  act -.-> domain
+  store -.-> domain
+  ui -.-> domain
+```
+
+要点は 3 つ。
+
+- **`lib/domain.ts` はどこからも参照されるが、何も参照しない。** 杯数もポイントも
+  混雑の判定も、サーバーとブラウザで同じ式を使うことで「画面ごとに数が違う」を防ぐ
+- **役割は Clerk のトークンではなく DB から読む。** Clerk は既定で `publicMetadata`
+  をトークンに含めないため
+- **節目のお知らせは cron ではなく `/api/snapshot` のついでに送る。** Vercel の
+  Hobby プランは cron が 1 日 1 回までで、開始 10 分前などの刻みに使えないため
+
+### 当日の流れ（シーケンス）
+
+```mermaid
+sequenceDiagram
+  autonumber
+  actor G as 参加者
+  participant P as 参加者の画面
+  participant A as Server Actions
+  participant D as Neon Postgres
+  participant Q as 蔵の画面
+  actor B as 酒蔵
+
+  rect rgb(245, 245, 235)
+  Note over G,D: 受付 ─ ポイントを受け取る
+  G->>P: 貼ってある QR を読む（/guest/charge が開く）
+  G->>P: 紙の券のコードを入れる
+  P->>A: redeemTicket(code)
+  A->>D: 券の消し込みとポイント加算を 1 本の SQL で
+  Note right of D: 条件を WHERE に入れているので、<br/>同じ券を同時に読んでも加算は 1 回だけ
+  D-->>A: 加算したポイント数
+  A-->>P: 残高を表示
+  end
+
+  rect rgb(240, 245, 240)
+  Note over G,D: 注文
+  G->>P: 蔵をえらぶ → 銘柄をえらぶ → 杯数を決める
+  Note over P: 残高が足りない銘柄は押せない
+  P->>A: order(itemId, cups)
+  A->>D: place_order()（PL/pgSQL）
+  Note right of D: 行ロックの中で 残高・在庫・受付状態を<br/>確かめてから引き落とす。売り過ぎない
+  D-->>A: ok、または断る理由（日本語）
+  A-->>P: マイページへ自動で移動
+  end
+
+  rect rgb(245, 240, 240)
+  Note over P,B: 受け渡し
+  loop 4 秒ごと
+    Q->>A: GET /api/snapshot
+    A-->>Q: 受付キュー
+    P->>A: GET /api/snapshot
+    A-->>P: 自分の注文の状態
+  end
+  B->>Q: 準備中にする
+  Q->>A: setRequestStatus(id, "preparing")
+  B->>Q: 準備完了にする
+  Q->>A: setRequestStatus(id, "ready")
+  P-->>G: 「できあがりました」に変わる
+  B->>Q: 受渡完了
+  Q->>A: setRequestStatus(id, "delivered")
+  A->>D: 状態遷移と在庫減を 1 本の SQL で
+  Note right of D: 在庫が減るのは受渡のとき。<br/>キャンセルならポイントを参加者に戻す
+  end
+```
+
+注文の状態は `accepted`（受付済）→ `preparing`（準備中）→ `ready`（準備完了 受取可）
+→ `delivered`（受渡完了）と進み、どの段階からも `cancelled`（キャンセル）にできる。
+遷移表そのものは `lib/domain.ts` の `STATUS_FLOW` にある。
+
 ### 設計上の要点
 
 - **環境変数が無くてもビルドと起動が成功する。** 主催者が「先にデプロイ、あとから
