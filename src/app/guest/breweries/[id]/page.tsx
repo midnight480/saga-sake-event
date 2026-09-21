@@ -62,8 +62,11 @@ export default function GuestBreweryDetailPage() {
             .join(' ・ ')}
         </div>
         {guest && (
-          <div className="mt-2 text-[12px] leading-none text-gold">
-            チケット残り {guest.tickets} 枚
+          <div className="mt-2 flex items-baseline gap-1.5">
+            <span className="font-display text-[24px] leading-none text-gold">
+              {guest.tickets}
+            </span>
+            <span className="text-[12px] text-ink-55">枚 持っています</span>
           </div>
         )}
       </header>
@@ -135,7 +138,7 @@ function OrderCard({
     : blocked
       ? blockedReason
       : notEnough
-        ? 'チケット不足'
+        ? `あと ${need - tickets} 枚 必要です`
         : `${need} 枚でリクエスト`;
 
   const submit = () => {
@@ -161,8 +164,13 @@ function OrderCard({
           <span className="text-[11.5px] leading-[1.6] text-ink-55">
             {item.kind} / 精米 {item.polish}% ・ {item.size}
           </span>
-          <span className="text-[11.5px] leading-none font-bold whitespace-nowrap text-gold">
-            チケット {item.ticketCost} 枚 / 杯
+          <span
+            className={`text-[11.5px] leading-none font-bold whitespace-nowrap ${
+              item.ticketCost <= tickets ? 'text-gold' : 'text-terracotta-soft'
+            }`}
+          >
+            1 杯 チケット {item.ticketCost} 枚
+            {item.ticketCost > tickets && '（足りません）'}
           </span>
         </div>
         <LeftBadge left={left} />
