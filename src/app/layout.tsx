@@ -1,9 +1,12 @@
+// ★ この import は必ず @clerk より前に置く（src/lib/env-init.ts の説明を参照）★
+import '@/lib/env-init';
+
 import type { Metadata, Viewport } from 'next';
 import { BIZ_UDPGothic, Kaisei_HarunoUmi } from 'next/font/google';
 import { ClerkProvider } from '@clerk/nextjs';
 import { jaJP } from '@clerk/localizations';
 
-import { hasClerk } from '@/lib/auth';
+import { clerkKeys, hasClerk } from '@/lib/auth';
 import './globals.css';
 
 // 書体は Google Fonts から取るが、next/font が自前配信に変えてくれる。
@@ -51,8 +54,15 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   // 付けると全ページが例外になり、案内画面 (/setup) すら開けなくなる。
   if (!hasClerk()) return content;
 
+  // 鍵はここではっきり渡す。
+  // Vercel の連携で入れると公開鍵の名前が
+  // NEXT_PUBLIC_AUTHENTICATION_CLERK_PUBLISHABLE_KEY になることがあり、
+  // その場合 Next.js はブラウザ側のコードに値を埋め込んでくれない。
+  // サーバーで読んだ値を props として渡せば、名前が何であっても届く。
+  const { publishableKey } = clerkKeys();
+
   return (
-    <ClerkProvider localization={jaJP} afterSignOutUrl="/">
+    <ClerkProvider localization={jaJP} afterSignOutUrl="/" publishableKey={publishableKey}>
       {content}
     </ClerkProvider>
   );

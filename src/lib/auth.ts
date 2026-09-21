@@ -13,6 +13,7 @@
 import { auth, currentUser, clerkClient } from '@clerk/nextjs/server';
 
 import { getSql, hasDatabase } from './db';
+import { originOf, resolveClerkPublishableKey, resolveClerkSecretKey } from './env';
 import { ensureSchema } from './schema';
 
 export type Role = 'organizer' | 'brewery' | 'guest';
@@ -25,12 +26,34 @@ export interface Viewer {
   email?: string;
 }
 
-/** Clerk の鍵が両方そろっているか。 */
+/**
+ * Clerk の鍵が両方そろっているか。
+ *
+ * 素の名前だけを見てはいけない。Vercel の連携で入れると
+ * AUTHENTICATION_CLERK_SECRET_KEY のようにプレフィックスが付くうえ、
+ * .env.example 由来の「中身が空の CLERK_SECRET_KEY」が別に作られていて、
+ * 素の名前だけ見ると「設定済みなのに未設定」と判定してしまう。
+ */
 export function hasClerk(): boolean {
-  return (
-    !!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY?.trim() &&
-    !!process.env.CLERK_SECRET_KEY?.trim()
-  );
+  return !!resolveClerkPublishableKey() && !!resolveClerkSecretKey();
+}
+
+/** 見つかった鍵。ClerkProvider や clerkMiddleware にそのまま渡す。 */
+export function clerkKeys(): { publishableKey?: string; secretKey?: string } {
+  return {
+    publishableKey: resolveClerkPublishableKey()?.value,
+    secretKey: resolveClerkSecretKey()?.value,
+  };
+}
+
+/** どの名前で見つかったか。/setup の診断に出す。 */
+export function clerkKeyNames(): { publishableKey?: string; secretKey?: string } {
+  // 正規化で写したものなら、写し元の名前を見せる（切り分けに使うため）。
+  const shown = (key?: string) => (key && originOf(key)) ?? key;
+  return {
+    publishableKey: shown(resolveClerkPublishableKey()?.key),
+    secretKey: shown(resolveClerkSecretKey()?.key),
+  };
 }
 
 /** .env の ORGANIZER_EMAILS。小文字にそろえて返す。 */
