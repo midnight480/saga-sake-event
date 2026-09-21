@@ -73,6 +73,27 @@ button {
   font-size: 16px;
 }
 
+/* iOS Safari の日付・時刻の入力欄は、中身から決まる幅（intrinsic width）を
+   持っていて、width:100% を当てても そこまでしか縮まない。上の font-size:16px で
+   中身が大きくなるぶん、この幅も広がる。
+
+   実際に /organizer/event の「開催日」「終了時刻」が iPhone で右枠からはみ出した。
+   親を flex にしている行では、min-width:auto と重なって列自体が縮めなくなる。
+
+   appearance を外して WebKit の既定の見た目と寸法をやめ、min-width を 0 にして
+   width:100% が効くようにする。押したときの日付ピッカーはそのまま出る。 */
+input[type='date'],
+input[type='time'],
+input[type='datetime-local'],
+input[type='month'],
+input[type='week'] {
+  -webkit-appearance: none;
+  appearance: none;
+  min-width: 0;
+  /* appearance を外すと Safari が中身を上寄せにするので、高さをそろえる。 */
+  min-height: 1.5em;
+}
+
 a {
   color: var(--color-gold);
 }
