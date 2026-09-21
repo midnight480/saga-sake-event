@@ -4,6 +4,7 @@ import '@/lib/env-init';
 import type { Metadata, Viewport } from 'next';
 import { BIZ_UDPGothic, Kaisei_HarunoUmi } from 'next/font/google';
 import { ClerkProvider } from '@clerk/nextjs';
+import { Analytics } from '@vercel/analytics/next';
 import { jaJP } from '@clerk/localizations';
 
 import { InstallHint } from '@/components/InstallHint';
@@ -66,6 +67,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body>
         {children}
         <InstallHint />
+        {/*
+          どの画面がどれだけ見られたかを Vercel 側で数える。
+          個人を追いかける種類のものではなく、当日どの画面に人が集まったかを
+          あとで振り返るために入れている。
+        */}
+        <Analytics />
       </body>
     </html>
   );
