@@ -9,6 +9,7 @@ import { useSnapshot } from '@/lib/useSnapshot';
 const TABS: Tab[] = [
   { href: '/brewery', label: '受付キュー', icon: '☰' },
   { href: '/brewery/stock', label: '持ち込み登録', icon: '◈' },
+  { href: '/brewery/help', label: 'ヘルプ', icon: '？' },
 ];
 
 interface BreweryContextValue {

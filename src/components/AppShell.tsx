@@ -84,7 +84,9 @@ export function AppShell({
                 <span aria-hidden className="text-[17px] leading-none">
                   {tab.icon}
                 </span>
-                <span className="text-[10.5px] leading-none">{tab.label}</span>
+                <span className="max-w-full truncate px-0.5 text-[10.5px] leading-none">
+                  {tab.label}
+                </span>
               </Link>
             );
           })}

@@ -1,0 +1,134 @@
+import { Eyebrow, ScreenHeader, Title } from '@/components/ui';
+import { HelpNote, HelpSection, HelpSteps, HelpText, HelpTroubles } from '@/components/Help';
+
+export default function BreweryHelpPage() {
+  return (
+    <>
+      <ScreenHeader>
+        <Eyebrow>HELP</Eyebrow>
+        <Title>酒蔵の使い方</Title>
+      </ScreenHeader>
+
+      <HelpSection title="開場前に、この順で">
+        <HelpSteps
+          items={[
+            <>
+              <strong className="text-ink">持ち込み登録</strong>を開きます。
+            </>,
+            <>
+              銘柄名を入れ、種類をえらびます。種類をえらぶと、精米歩合とポイントの
+              よく使う値が自動で入ります。
+            </>,
+            <>
+              <strong className="text-ink">1 杯 いただくのに何ポイント使うか</strong>を決めます。
+              銘柄ごとに変えられます。
+            </>,
+            <>瓶のサイズをえらんで「この銘柄を登録する」。</>,
+            <>
+              登録したら、<strong className="text-ink">本数</strong>を ＋ で入れます。
+              提供できる杯数が自動で出ます（四合瓶 = 6 杯 / 一升瓶 = 15 杯）。
+            </>,
+          ]}
+        />
+        <HelpNote>
+          本数を入れないと、参加者からは「完売」に見えます。持ち込んだ本数を
+          必ず入れてください。
+        </HelpNote>
+      </HelpSection>
+
+      <HelpSection title="当日の進め方">
+        <HelpText>
+          <strong className="text-ink">受付キュー</strong>を開いたままにしてください。
+          参加者が注文すると、ここに並びます。
+        </HelpText>
+        <HelpText>1 件ずつ、次の順にボタンを押します。</HelpText>
+        <div className="rounded-card border border-hairline bg-card p-4 font-mono text-[11.5px] leading-[2] text-ink-70">
+          受付済
+          <br />
+          　→ 準備中にする
+          <br />
+          　→ 準備完了にする
+          <br />
+          　→ 受渡完了
+        </div>
+        <HelpNote>
+          「受渡完了」を押した瞬間に在庫が減ります。お客さまにお渡ししてから
+          押してください。
+        </HelpNote>
+        <HelpText>
+          押すたびに、参加者の画面の言葉が変わります。「準備中にする」を押せば、
+          参加者には「いま注いでいます。ブース前でお待ちください」と出ます。
+        </HelpText>
+      </HelpSection>
+
+      <HelpSection title="手が回らなくなったら">
+        <HelpText>
+          受付キューの上にある
+          <strong className="text-ink">「新規リクエストを一時停止する」</strong>
+          を押してください。参加者の画面に「受付停止中」と出て、新しい注文が来なくなります。
+        </HelpText>
+        <HelpText>
+          すでに受けている注文は残るので、落ち着いてから片付けてください。
+          再開するときは「受付を再開する」です。
+        </HelpText>
+        <HelpNote>
+          止めたままにすると、主催者の画面で黄色く表示されます。再開を忘れないよう
+          気をつけてください。
+        </HelpNote>
+      </HelpSection>
+
+      <HelpSection title="困ったとき">
+        <HelpTroubles
+          rows={[
+            {
+              when: 'ログインできない',
+              then: (
+                <>
+                  蔵ID（kura-001 など）とパスワードをもう一度お確かめください。
+                  分からなくなったら、主催者に「再発行」をお願いしてください。
+                  その場で新しいパスワードが出ます。
+                </>
+              ),
+            },
+            {
+              when: '本数を減らせない',
+              then: (
+                <>
+                  お渡しした分と、いま受けている注文の分は残す必要があります。
+                  先に受付キューを片付けてから、減らしてください。
+                </>
+              ),
+            },
+            {
+              when: '銘柄を消せない',
+              then: (
+                <>
+                  すでに注文が入った銘柄は消せません（履歴が壊れるためです）。
+                  本数を 0 にすると、参加者からは「完売」に見えます。
+                </>
+              ),
+            },
+            {
+              when: '注文が届かない',
+              then: (
+                <>
+                  主催者が受付を開いていない可能性があります。あわせて、自分の蔵が
+                  「受付停止中」になっていないかもお確かめください。
+                </>
+              ),
+            },
+            {
+              when: '間違えて「受渡完了」を押した',
+              then: (
+                <>
+                  その注文は元に戻せません。参加者のポイントを戻したい場合は、
+                  主催者にお伝えください。
+                </>
+              ),
+            },
+          ]}
+        />
+      </HelpSection>
+    </>
+  );
+}

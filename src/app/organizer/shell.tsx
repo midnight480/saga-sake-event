@@ -5,10 +5,12 @@ import { orderingStatus } from '@/lib/domain';
 import { useSnapshot } from '@/lib/useSnapshot';
 
 const TABS: Tab[] = [
-  { href: '/organizer', label: 'ダッシュボード', icon: '◱' },
+  // タブが 5 つ並ぶので、狭い端末でも収まる長さにしている。
+  { href: '/organizer', label: '運営状況', icon: '◱' },
   { href: '/organizer/event', label: 'イベント設定', icon: '⚙' },
   { href: '/organizer/breweries', label: '蔵アカウント', icon: '◈' },
   { href: '/organizer/tickets', label: 'チケットQR', icon: '▦' },
+  { href: '/organizer/help', label: 'ヘルプ', icon: '？' },
 ];
 
 export function OrganizerShell({ children }: { children: React.ReactNode }) {
