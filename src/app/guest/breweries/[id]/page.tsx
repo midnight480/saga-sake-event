@@ -16,8 +16,8 @@ import {
 } from '@/components/ui';
 import {
   MAX_CUPS_PER_REQUEST,
-  isOrderingOpen,
   itemAvailableCups,
+  orderingStatus,
   waitingCount,
   type Item,
 } from '@/lib/domain';
@@ -42,7 +42,8 @@ export default function GuestBreweryDetailPage() {
   }
 
   const waiting = waitingCount(snapshot.requests, brewery.id);
-  const beforeStart = !isOrderingOpen(snapshot.event, new Date(snapshot.serverTime));
+  // 受付が閉じている理由まで見て、参加者に伝える言葉を変える。
+  const status = orderingStatus(snapshot.event, new Date(snapshot.serverTime));
   const guest = snapshot.guest;
 
   return (
@@ -67,12 +68,14 @@ export default function GuestBreweryDetailPage() {
         )}
       </header>
 
-      {beforeStart && (
+      {!status.open && (
         <div className="px-5 pt-4">
           <Notice tone="info">
-            {snapshot.event.phase === 'closed'
-              ? 'イベントは終了しました。'
-              : `${snapshot.event.startTime} の開始までリクエストは送れません。`}
+            {status.manual
+              ? 'いま主催者が受付を止めています。再開までお待ちください。'
+              : status.label === '終了'
+                ? 'イベントは終了しました。'
+                : `${snapshot.event.startTime} の開始までリクエストは送れません。`}
           </Notice>
         </div>
       )}
@@ -92,14 +95,8 @@ export default function GuestBreweryDetailPage() {
               key={item.id}
               item={item}
               tickets={guest?.tickets ?? 0}
-              blocked={beforeStart || !brewery.accepting}
-              blockedReason={
-                beforeStart
-                  ? snapshot.event.phase === 'closed'
-                    ? '終了しました'
-                    : '開始前'
-                  : '受付停止中'
-              }
+              blocked={!status.open || !brewery.accepting}
+              blockedReason={!status.open ? status.label : '受付停止中'}
             />
           ))
         )}

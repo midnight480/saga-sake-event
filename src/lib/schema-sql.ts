@@ -25,11 +25,11 @@ export const STATEMENTS: string[] = [
      event_date           date        NOT NULL DEFAULT CURRENT_DATE,
      start_time           text        NOT NULL DEFAULT '11:00',
      end_time             text        NOT NULL DEFAULT '16:00',
-     phase                text        NOT NULL DEFAULT 'before',
+     phase                text        NOT NULL DEFAULT 'auto',
      target_brewery_count integer     NOT NULL DEFAULT 30,
      updated_at           timestamptz NOT NULL DEFAULT now(),
      CONSTRAINT events_single_row CHECK (id = 1),
-     CONSTRAINT events_phase_valid CHECK (phase IN ('before', 'open', 'closed'))
+     CONSTRAINT events_phase_valid CHECK (phase IN ('auto', 'before', 'open', 'closed'))
    )`,
 
   // ── 酒蔵 ──
@@ -242,6 +242,14 @@ export const SEED_STATEMENTS: string[] = [
      ('advance',  '前売券', 'SAGA-ADV', true, 10, '事前に販売する券', 0),
      ('same-day', '当日券', 'SAGA-DAY', true, 10, '会場で販売する券', 1)
    ON CONFLICT (id) DO NOTHING`,
+
+  // 受付の開け閉めを「予定どおり（auto）」を既定に変えた分の移行。
+  // 既存の表には古い CHECK と DEFAULT が残っているので、貼り替える。
+  `ALTER TABLE events ALTER COLUMN phase SET DEFAULT 'auto'`,
+  `ALTER TABLE events DROP CONSTRAINT IF EXISTS events_phase_valid`,
+  `ALTER TABLE events ADD CONSTRAINT events_phase_valid
+     CHECK (phase IN ('auto', 'before', 'open', 'closed'))`,
+  `UPDATE events SET phase = 'auto' WHERE phase = 'before'`,
 
   // 券種名から「10枚」を外す。枚数は主催者が画面で決められるようになったので、
   // 名前に焼き込むと実際の設定と食い違う。すでに直っていれば何もしない。

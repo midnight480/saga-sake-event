@@ -18,10 +18,16 @@ export type RequestStatus =
   | 'delivered' // 受渡完了 — ここで初めて在庫が減る
   | 'cancelled'; // キャンセル — チケットは参加者に戻る
 
+/**
+ * 受付の開け閉めをどう決めるか。
+ *
+ * 原則は 'auto'（開始時刻〜終了時刻のあいだだけ受け付ける）。
+ * 'open' と 'closed' は、主催者がその場の判断で予定を上書きしたときの状態。
+ */
 export type EventPhase =
-  | 'before' // 開始前 — 参加者はリクエストを送れない
-  | 'open' // 開催中
-  | 'closed'; // 終了
+  | 'auto' // 予定どおり（既定）
+  | 'open' // 手動で開けている
+  | 'closed'; // 手動で閉じている
 
 export type GuestKind = '一般参加' | '酒蔵特別枠';
 
@@ -301,6 +307,54 @@ export function isTicketShortage(sameDayForSale: number, stockTickets: number): 
 // 時刻
 // ─────────────────────────────────────────────────────────────
 
+/**
+ * イベントの時刻を解釈するときの時差。
+ *
+ * ★ サーバーの時計を基準にしてはいけない ★
+ * 開催日と時刻は日本時間で入力される。ところが Vercel のサーバーは UTC で
+ * 動くので、new Date().getHours() を使うと 9 時間ずれる。11:00 開始のはずが
+ * 02:00 で開いてしまう。必ずこの時差を付けて絶対時刻に直す。
+ */
+export const EVENT_UTC_OFFSET = '+09:00';
+
+/** 開催日・開始時刻・終了時刻から、受付を行う時間帯を絶対時刻で組み立てる。 */
+export function scheduleWindow(event: EventSettings): { start: Date; end: Date } {
+  const start = new Date(`${event.eventDate}T${event.startTime}:00${EVENT_UTC_OFFSET}`);
+  let end = new Date(`${event.eventDate}T${event.endTime}:00${EVENT_UTC_OFFSET}`);
+  // 終了が開始以前なら日をまたぐ指定とみなす（23:00〜01:00 など）。
+  if (end.getTime() <= start.getTime()) end = new Date(end.getTime() + 24 * 60 * 60 * 1000);
+  return { start, end };
+}
+
+/** 予定の時間帯の中にいるか。 */
+export function isWithinSchedule(event: EventSettings, now: Date = new Date()): boolean {
+  const { start, end } = scheduleWindow(event);
+  return now.getTime() >= start.getTime() && now.getTime() < end.getTime();
+}
+
+export interface OrderingStatus {
+  /** 参加者がリクエストを送れるか。 */
+  open: boolean;
+  /** 予定ではなく主催者の操作で決まっている状態か。 */
+  manual: boolean;
+  /** 画面に出す短い言葉。 */
+  label: string;
+}
+
+/**
+ * いま受付をしているか、それはなぜか。
+ * 主催者の上書きがあればそれに従い、無ければ予定どおりに判断する。
+ */
+export function orderingStatus(event: EventSettings, now: Date = new Date()): OrderingStatus {
+  if (event.phase === 'open') return { open: true, manual: true, label: '受付中（手動）' };
+  if (event.phase === 'closed') return { open: false, manual: true, label: '停止中（手動）' };
+
+  const { start, end } = scheduleWindow(event);
+  if (now.getTime() < start.getTime()) return { open: false, manual: false, label: '開始前' };
+  if (now.getTime() >= end.getTime()) return { open: false, manual: false, label: '終了' };
+  return { open: true, manual: false, label: '受付中' };
+}
+
 /** 'HH:MM' を 0 時からの分数へ。壊れた入力は 0 として扱う。 */
 export function timeToMinutes(hhmm: string): number {
   const [h, m] = String(hhmm).split(':');
@@ -322,14 +376,9 @@ export function minutesSince(iso: string, now: Date = new Date()): number {
   return Math.max(0, Math.floor((now.getTime() - then) / 60000));
 }
 
-/**
- * 参加者がリクエストを送れるか。
- * 開催中でなければ送れない。開催中でも開始時刻前は送れない。
- */
+/** 参加者がリクエストを送れるか。 */
 export function isOrderingOpen(event: EventSettings, now: Date = new Date()): boolean {
-  if (event.phase !== 'open') return false;
-  const nowMinutes = now.getHours() * 60 + now.getMinutes();
-  return nowMinutes >= timeToMinutes(event.startTime);
+  return orderingStatus(event, now).open;
 }
 
 /** 主催者に出す応答遅延アラート。 */

@@ -320,8 +320,8 @@ function BreweryCard({ brewery }: { brewery: Brewery }) {
 
       {!brewery.hasLoginAccount && !fresh && (
         <Notice tone="warn" title="この蔵はまだログインできません">
-          ログイン用のアカウントが作られていません。Clerk の設定で「Username」が有効になっているか
-          確かめてから、下のボタンを押してください。
+          ログイン用のアカウントが作られていません。下のボタンを押すと作成します。
+          失敗したときは、その理由がここに出ます。
         </Notice>
       )}
 

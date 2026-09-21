@@ -6,6 +6,7 @@ import { saveEvent, setPhase, setTicketCount } from '@/app/actions';
 import {
   Button,
   Card,
+  ConfirmDialog,
   Empty,
   Eyebrow,
   Field,
@@ -17,7 +18,7 @@ import {
   Title,
   inputClass,
 } from '@/components/ui';
-import type { TicketBatch } from '@/lib/domain';
+import { orderingStatus, type EventPhase, type TicketBatch } from '@/lib/domain';
 import { useSnapshot } from '@/lib/useSnapshot';
 
 /** STEP 1 ── イベントの日付・時刻・規模を決める。 */
@@ -26,6 +27,9 @@ export default function EventSettingsPage() {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+  // 受付解禁は会場全体に影響するので、押し間違いを確認で受け止める。
+  // 予定を上書きする操作は、押し間違いを確認で受け止める。
+  const [confirming, setConfirming] = useState<'open' | 'closed' | null>(null);
 
   // 入力中に 4 秒ごとのポーリングで値が戻ってしまわないよう、
   // 編集内容はいったん手元に持つ。
@@ -54,7 +58,7 @@ export default function EventSettingsPage() {
   const { event, breweries } = snapshot;
   const registered = breweries.length;
   const unregistered = Math.max(0, draft.targetBreweryCount - registered);
-  const isOpen = event.phase === 'open';
+  const status = orderingStatus(event, new Date(snapshot.serverTime));
 
   const commit = (patch: Partial<typeof draft>) => {
     const next = { ...draft, ...patch };
@@ -72,10 +76,11 @@ export default function EventSettingsPage() {
     });
   };
 
-  const togglePhase = () => {
+  const applyPhase = (phase: EventPhase) => {
     setError(null);
+    setConfirming(null);
     startTransition(async () => {
-      const result = await setPhase(isOpen ? 'closed' : 'open');
+      const result = await setPhase(phase);
       if (!result.ok) setError(result.reason);
       await refresh();
     });
@@ -159,22 +164,73 @@ export default function EventSettingsPage() {
 
       <div className="flex flex-col gap-5 px-5 py-5">
         <div className="flex flex-col gap-3 border-t border-hairline pt-5">
-          <Note>開始時刻を過ぎるまで、参加者はリクエストを送れません。</Note>
-          <Button
-            tone={isOpen ? 'flat' : 'go'}
-            block
-            onClick={togglePhase}
-            disabled={pending}
-            className={isOpen ? 'border-forest bg-forest text-ink' : undefined}
-          >
-            {isOpen ? 'イベントを終了する' : 'イベントを開始する（受付解禁）'}
-          </Button>
-          {!isOpen && registered === 0 && (
-            <Notice tone="info">
-              先に「蔵アカウント」で出展する酒蔵を登録してください。蔵が 0 のままイベントを開始すると、
-              参加者は注文する相手がいない状態になります。
-            </Notice>
+          <div className="flex items-baseline justify-between gap-2">
+            <span className="text-[11.5px] leading-none tracking-[0.08em] text-ink-55">
+              いまの受付
+            </span>
+            <span
+              className={`text-[13px] font-bold leading-none ${
+                status.open ? 'text-matcha' : status.manual ? 'text-terracotta-soft' : 'text-gold'
+              }`}
+            >
+              {status.label}
+            </span>
+          </div>
+
+          <Note>
+            {draft.startTime} から {draft.endTime} までは自動で受け付けます。
+            {status.manual && '　いまは予定を上書きしています。'}
+          </Note>
+
+          {status.manual ? (
+            <Button tone="go" block onClick={() => applyPhase('auto')} disabled={pending}>
+              予定どおりにもどす
+            </Button>
+          ) : status.open ? (
+            <Button tone="flat" block onClick={() => setConfirming('closed')} disabled={pending}>
+              いますぐ受付を止める
+            </Button>
+          ) : (
+            <Button tone="go" block onClick={() => setConfirming('open')} disabled={pending}>
+              いますぐ受付を開く
+            </Button>
           )}
+
+          <ConfirmDialog
+            open={confirming === 'open'}
+            title="いますぐ受付を開きますか"
+            confirmLabel="はい、開きます"
+            onConfirm={() => applyPhase('open')}
+            onCancel={() => setConfirming(null)}
+            pending={pending}
+          >
+            本来は {draft.startTime} から自動で受け付けます。それを待たずに、
+            いまから参加者がリクエストを送れる状態にします。
+            <br />
+            登録済みの酒蔵は {registered} 蔵です。
+            {registered === 0 && (
+              <>
+                <br />
+                <span className="text-terracotta-soft">
+                  まだ酒蔵が 1 つも登録されていません。このまま開くと、参加者は注文する相手がいない状態になります。
+                </span>
+              </>
+            )}
+          </ConfirmDialog>
+
+          <ConfirmDialog
+            open={confirming === 'closed'}
+            title="いますぐ受付を止めますか"
+            confirmLabel="はい、止めます"
+            onConfirm={() => applyPhase('closed')}
+            onCancel={() => setConfirming(null)}
+            pending={pending}
+          >
+            本来は {draft.endTime} まで受け付けます。それを待たずに、いまから参加者が
+            リクエストを送れない状態にします。
+            <br />
+            すでに受けている注文は残ります。蔵の画面から最後まで進めてください。
+          </ConfirmDialog>
         </div>
       </div>
     </>

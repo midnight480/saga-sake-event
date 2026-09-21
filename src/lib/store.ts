@@ -56,7 +56,8 @@ export async function getEvent(): Promise<EventSettings> {
     eventDate: toDateString(row?.event_date),
     startTime: String(row?.start_time ?? '11:00'),
     endTime: String(row?.end_time ?? '16:00'),
-    phase: (row?.phase as EventPhase) ?? 'before',
+    // 'before' は旧データ。移行前に読んでも壊れないよう auto に寄せる。
+    phase: row?.phase === 'open' || row?.phase === 'closed' ? row.phase : 'auto',
     targetBreweryCount: Number(row?.target_brewery_count ?? 30),
   };
 }
@@ -621,17 +622,21 @@ export async function createRequest(input: {
   itemId: string;
   cups: number;
 }): Promise<Result<{ id: number; spent: number }>> {
-  const { MAX_CUPS_PER_REQUEST, isOrderingOpen } = await import('./domain');
+  const { MAX_CUPS_PER_REQUEST } = await import('./domain');
   if (input.cups < 1 || input.cups > MAX_CUPS_PER_REQUEST) {
     return fail(`一度に頼めるのは 1〜${MAX_CUPS_PER_REQUEST} 杯です。`);
   }
 
   const event = await getEvent();
-  if (!isOrderingOpen(event)) {
+  const { orderingStatus } = await import('./domain');
+  const status = orderingStatus(event);
+  if (!status.open) {
     return fail(
-      event.phase === 'closed'
-        ? 'イベントは終了しました。'
-        : `${event.startTime} の開始までリクエストは送れません。`,
+      status.manual
+        ? 'いま主催者が受付を停止しています。'
+        : status.label === '終了'
+          ? 'イベントは終了しました。'
+          : `${event.startTime} の開始までリクエストは送れません。`,
     );
   }
 

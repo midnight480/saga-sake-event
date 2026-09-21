@@ -3,6 +3,7 @@
 import { createContext, useContext } from 'react';
 
 import { AppShell, type Tab } from '@/components/AppShell';
+import { orderingStatus } from '@/lib/domain';
 import { useSnapshot } from '@/lib/useSnapshot';
 
 const TABS: Tab[] = [
@@ -43,7 +44,9 @@ export function BreweryShell({
         role="酒蔵"
         roleEn="BREWERY"
         subject={brewery?.name}
-        phase={snapshot?.event.phase}
+        status={
+        snapshot ? orderingStatus(snapshot.event, new Date(snapshot.serverTime)) : undefined
+      }
         tabs={TABS}
         stale={isStale}
       >
