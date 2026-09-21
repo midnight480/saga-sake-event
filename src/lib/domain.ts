@@ -231,6 +231,82 @@ export interface Inquiry {
   createdAt: string;
 }
 
+/**
+ * お知らせを出す節目。
+ *
+ * 会場では画面を見ていないことのほうが多い。節目だけを押さえて、
+ * それ以外では鳴らさない。鳴りすぎると切られてしまう。
+ */
+export type Milestone = 'before-start' | 'start' | 'before-end' | 'end';
+
+export const MILESTONES: {
+  id: Milestone;
+  /** 開始（または終了）から何分ずらすか。負なら前。 */
+  offsetMinutes: number;
+  /** どちらの時刻を基準にするか。 */
+  from: 'start' | 'end';
+  title: string;
+  body: string;
+}[] = [
+  {
+    id: 'before-start',
+    from: 'start',
+    offsetMinutes: -10,
+    title: 'まもなく開始します',
+    body: 'あと 10 分で受付が始まります。準備をお願いします。',
+  },
+  {
+    id: 'start',
+    from: 'start',
+    offsetMinutes: 0,
+    title: '受付がはじまりました',
+    body: 'お酒のリクエストを送れるようになりました。',
+  },
+  {
+    id: 'before-end',
+    from: 'end',
+    offsetMinutes: -30,
+    title: 'まもなく終了します',
+    body: 'あと 30 分で受付が終わります。お早めにどうぞ。',
+  },
+  {
+    id: 'end',
+    from: 'end',
+    offsetMinutes: 0,
+    title: '受付が終わりました',
+    body: '本日はありがとうございました。受け取り残しがないかご確認ください。',
+  },
+];
+
+/** その節目が、いつ来るか。 */
+export function milestoneAt(event: EventSettings, milestone: Milestone): Date | null {
+  const spec = MILESTONES.find((m) => m.id === milestone);
+  if (!spec) return null;
+  const window = scheduleWindow(event);
+  const base = spec.from === 'start' ? window.start : window.end;
+  return new Date(base.getTime() + spec.offsetMinutes * 60 * 1000);
+}
+
+/**
+ * いま送るべき節目。
+ *
+ * 過ぎたものだけを返す。ただし、あまりに昔のものは返さない。
+ * 誰もアプリを開いていなかった時間帯のぶんを、あとからまとめて鳴らすと
+ * 意味が無いうえ、驚かせるだけだから。
+ */
+export function dueMilestones(
+  event: EventSettings,
+  now: Date = new Date(),
+  graceMinutes = 20,
+): Milestone[] {
+  return MILESTONES.filter((spec) => {
+    const at = milestoneAt(event, spec.id);
+    if (!at) return false;
+    const passed = now.getTime() - at.getTime();
+    return passed >= 0 && passed <= graceMinutes * 60 * 1000;
+  }).map((spec) => spec.id);
+}
+
 /** 蔵が応答しないまま何分経ったら主催者に警告を出すか。 */
 export const STALE_REQUEST_MINUTES = 12;
 

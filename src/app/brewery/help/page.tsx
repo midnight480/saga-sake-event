@@ -1,5 +1,6 @@
 import { Eyebrow, ScreenHeader, Title } from '@/components/ui';
 import { HelpNote, HelpSection, HelpSteps, HelpText, HelpTroubles } from '@/components/Help';
+import { PushSettings } from '@/components/PushSettings';
 import { InquiryForm } from '@/components/InquiryForm';
 
 export default function BreweryHelpPage() {
@@ -9,6 +10,8 @@ export default function BreweryHelpPage() {
         <Eyebrow>HELP</Eyebrow>
         <Title>酒蔵の使い方</Title>
       </ScreenHeader>
+
+      <PushSettings />
 
       <HelpSection title="開場前に、この順で">
         <HelpSteps
