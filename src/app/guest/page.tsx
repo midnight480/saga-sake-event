@@ -1,23 +1,16 @@
 'use client';
 
 import Link from 'next/link';
-import { useState, useTransition } from 'react';
-
-import { chooseGuestKind } from '@/app/actions';
 import {
-  Button,
   Card,
-  Chip,
   Empty,
   Eyebrow,
   Note,
-  Notice,
   SectionLabel,
   StatusBadge,
   Title,
-  inputClass,
 } from '@/components/ui';
-import { INITIAL_TICKETS, STATUS_MESSAGE, type GuestKind } from '@/lib/domain';
+import { STATUS_MESSAGE } from '@/lib/domain';
 import { useSnapshot } from '@/lib/useSnapshot';
 
 /** マイページ。チケット残高と、自分の注文の様子。 */
@@ -29,9 +22,9 @@ export default function GuestHome() {
   const guest = snapshot.guest;
   if (!guest) return <Empty>参加者の情報が読み込めませんでした。画面を更新してください。</Empty>;
 
-  // まだ 1 枚も持っていない＝参加区分を選んでいない人。最初にここを通す。
-  const needsKind = guest.tickets === 0 && guest.used === 0;
-  if (needsKind) return <ChooseKind />;
+  // まだ一度もポイントが入っていない人。受付での読み取りに案内する。
+  const notStarted = guest.tickets === 0 && guest.used === 0;
+  if (notStarted) return <BeforeStart displayNo={guest.displayNo} />;
 
   const myRequests = snapshot.requests
     .filter((r) => r.guestClerkId === guest.clerkUserId)
@@ -40,15 +33,8 @@ export default function GuestHome() {
   return (
     <>
       <header className="border-b border-hairline bg-linear-to-b from-card to-surface px-5 pt-5 pb-6">
-        <div className="mb-4 flex items-center justify-between">
+        <div className="mb-4">
           <span className="text-[12px] text-ink-55">{guest.displayNo}</span>
-          <span
-            className={`rounded-full px-2.5 py-1.5 text-[10.5px] font-bold leading-none ${
-              guest.kind === '酒蔵特別枠' ? 'bg-gold/18 text-gold-bright' : 'bg-ink/9 text-ink-55'
-            }`}
-          >
-            {guest.kind}
-          </span>
         </div>
 
         <Eyebrow>TICKETS</Eyebrow>
@@ -105,78 +91,43 @@ export default function GuestHome() {
   );
 }
 
-/** 参加区分をえらぶ。ここで初回のチケットが配られる。 */
-function ChooseKind() {
-  const { refresh } = useSnapshot();
-  const [kind, setKind] = useState<GuestKind>('一般参加');
-  const [inviteCode, setInviteCode] = useState('');
-  const [error, setError] = useState<string | null>(null);
-  const [pending, startTransition] = useTransition();
-
-  const submit = () => {
-    setError(null);
-    startTransition(async () => {
-      const result = await chooseGuestKind(kind, inviteCode);
-      if (!result.ok) setError(result.reason);
-      await refresh();
-    });
-  };
-
+/**
+ * まだポイントが入っていない人に見せる画面。
+ *
+ * 参加区分を自分で選ばせるのをやめた。当日は受付で券を受け取り、その QR を
+ * 読み取って始める。券の種類で配るポイントが決まるので、本人が選ぶものは無い。
+ */
+function BeforeStart({ displayNo }: { displayNo: string }) {
   return (
     <div className="flex flex-col gap-6 px-5 py-8">
       <div>
         <Eyebrow>WELCOME</Eyebrow>
-        <Title size="lg">参加区分をえらぶ</Title>
+        <Title size="lg">受付で券を受け取ってください</Title>
         <div className="mt-3">
           <Note>
-            えらぶと、その区分のポイントが配られます。あとから変えられないので、
-            お手元の案内をご確認ください。
+            会場の受付で券をお受け取りのうえ、その QR コードを読み取ってください。
+            読み取ると、この画面にポイントが入ります。
           </Note>
         </div>
       </div>
 
-      <div className="flex gap-2">
-        {(['一般参加', '酒蔵特別枠'] as GuestKind[]).map((k) => (
-          <Chip key={k} active={kind === k} className="flex-1" onClick={() => setKind(k)}>
-            {k}
-          </Chip>
-        ))}
-      </div>
-
       <Card>
         <div className="flex items-baseline justify-between">
-          <span className="text-[12px] text-ink-55">配られるポイント</span>
-          <span>
-            <span className="font-display text-[30px] text-gold">{INITIAL_TICKETS[kind]}</span>
-            <span className="ml-1 text-[12px] text-ink-55">ポイント</span>
-          </span>
+          <span className="text-[12px] text-ink-55">あなたの番号</span>
+          <span className="font-display text-[20px] text-ink">{displayNo}</span>
         </div>
       </Card>
 
-      {kind === '酒蔵特別枠' && (
-        <label className="flex flex-col gap-2">
-          <span className="text-[11.5px] leading-none tracking-[0.08em] text-ink-55">
-            招待コード
-          </span>
-          <input
-            value={inviteCode}
-            onChange={(e) => setInviteCode(e.target.value)}
-            placeholder="主催者から伝えられたコード"
-            className={inputClass}
-            autoCapitalize="off"
-            autoCorrect="off"
-          />
-          <span className="text-[11px] leading-[1.6] text-ink-45">
-            酒蔵特別枠は、関係者向けの枠です。コードは主催者にお尋ねください。
-          </span>
-        </label>
-      )}
+      <Link
+        href="/guest/charge"
+        className="flex min-h-14 items-center justify-center rounded-field bg-terracotta text-[15px] font-bold tracking-[0.08em] text-white transition-colors hover:bg-terracotta-hover"
+      >
+        券の QR を読み取る
+      </Link>
 
-      {error && <Notice tone="danger">{error}</Notice>}
-
-      <Button tone="go" block onClick={submit} disabled={pending}>
-        {pending ? '登録しています…' : 'この区分ではじめる'}
-      </Button>
+      <p className="text-[11.5px] leading-[1.9] text-ink-45">
+        券をお持ちでない場合は、会場の受付にお声がけください。
+      </p>
     </div>
   );
 }

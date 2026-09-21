@@ -562,23 +562,6 @@ export async function getOrCreateGuest(clerkUserId: string): Promise<Guest> {
   };
 }
 
-/**
- * 参加区分を「酒蔵特別枠」にする。
- * 無条件に枠を変えられると特別枠の意味が無いので、まだ 1 枚も使っていない
- * 参加者だけが切り替えられる。
- */
-export async function setGuestKind(clerkUserId: string, kind: GuestKind): Promise<Result> {
-  const sql = await db();
-  const rows = (await sql`
-    UPDATE guests SET kind = ${kind}
-    WHERE clerk_user_id = ${clerkUserId} AND used = 0
-    RETURNING clerk_user_id
-  `) as { clerk_user_id: string }[];
-  return rows.length > 0
-    ? ok(undefined)
-    : fail('すでにポイントを使っているため、参加区分は変更できません。');
-}
-
 // ─────────────────────────────────────────────────────────────
 // 注文
 // ─────────────────────────────────────────────────────────────
