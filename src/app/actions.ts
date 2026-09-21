@@ -417,6 +417,76 @@ export async function redeemTicket(
   });
 }
 
+// ═════════════════════════════════════════════════════════════
+// 酒蔵のログイン
+// ═════════════════════════════════════════════════════════════
+
+/**
+ * 蔵IDとパスワードでログインする。
+ *
+ * ★ なぜ Clerk の標準のログイン画面を使わないのか ★
+ * 蔵アカウントには受信できないメールアドレスを割り当てている。標準の画面で
+ * ログインしようとすると、Clerk が「新しいデバイスからのサインイン」を
+ * 検知して、そのアドレス宛に確認コードを送ってしまう。届かないので、蔵は
+ * 永久に入れない。
+ *
+ * そこでパスワードの照合をサーバー側で行い、通ったらサインイン用の
+ * 引換券（sign-in token）を発行して、その URL へ送る。対話的な確認は
+ * 一切入らない。照合も発行も Clerk の管理 API なので、認証の土台は
+ * Clerk のままである。
+ */
+export async function signInBrewery(
+  loginId: string,
+  password: string,
+): Promise<ActionResult<{ url: string }>> {
+  return run(async () => {
+    const id = loginId.trim().toLowerCase();
+    if (!id || !password) return { ok: false, reason: '蔵IDとパスワードを入れてください。' };
+
+    const brewery = (await store.listBreweries()).find((b) => b.loginId.toLowerCase() === id);
+    // 蔵が無い場合も、パスワード違いと同じ文言にする。
+    // 蔵IDが実在するかどうかを、総当たりで探れないようにするため。
+    const wrong = { ok: false as const, reason: '蔵IDかパスワードが違います。' };
+    if (!brewery) return wrong;
+
+    const clerkUserId = await store.getBreweryClerkUserId(brewery.id);
+    if (!clerkUserId) {
+      return {
+        ok: false,
+        reason: 'この蔵のログインアカウントがまだ作られていません。主催者にお伝えください。',
+      };
+    }
+
+    const client = await clerkClient();
+
+    try {
+      const result = await client.users.verifyPassword({ userId: clerkUserId, password });
+      if (!result.verified) return wrong;
+    } catch {
+      // 回数超過などで弾かれた場合もここに来る。
+      return wrong;
+    }
+
+    try {
+      const token = await client.signInTokens.createSignInToken({
+        userId: clerkUserId,
+        // 押してから移動するまでの数十秒あれば足りる。短くして漏えい時の窓を狭める。
+        expiresInSeconds: 120,
+      });
+      // 引換券は Clerk のログイン画面が受け取って処理する。参加者向けの画面を
+      // 一瞬通るが、操作は要らず、そのまま蔵の画面へ抜ける。
+      const ticket = encodeURIComponent(token.token);
+      return {
+        ok: true,
+        value: { url: `/sign-in?__clerk_ticket=${ticket}&redirect_url=${encodeURIComponent('/brewery')}` },
+      };
+    } catch (error) {
+      console.error('[clerk] サインイン用の引換券を作れませんでした', error);
+      return { ok: false, reason: 'ログインできませんでした。しばらく待ってお試しください。' };
+    }
+  });
+}
+
 /** 参加者としてログインした直後に、台帳と役割メタデータを整える。 */
 export async function ensureGuestRegistered(): Promise<ActionResult<{ kindChosen: boolean }>> {
   return run(async () => {
