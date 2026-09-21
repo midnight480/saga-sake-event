@@ -230,6 +230,29 @@ export const STATEMENTS: string[] = [
    END;
    $fn$`,
 
+  // ── 問い合わせ。蔵・参加者 → 主催者の一問一答。
+  //    やり取りが続く前提にしない。会場で長い会話はできないので、
+  //    1 つの問いに 1 つの答えを返して終わりにする。──
+  `CREATE TABLE IF NOT EXISTS inquiries (
+     id             bigserial PRIMARY KEY,
+     from_clerk_id  text        NOT NULL,
+     from_role      text        NOT NULL,
+     from_label     text        NOT NULL,
+     brewery_id     text        REFERENCES breweries (id) ON DELETE SET NULL,
+     subject        text        NOT NULL DEFAULT '',
+     body           text        NOT NULL,
+     answer         text,
+     answered_at    timestamptz,
+     created_at     timestamptz NOT NULL DEFAULT now(),
+     CONSTRAINT inquiries_role_valid CHECK (from_role IN ('brewery', 'guest')),
+     CONSTRAINT inquiries_body_not_empty CHECK (length(btrim(body)) > 0)
+   )`,
+  // 未回答を先に出すので、その順で引けるようにする。
+  `CREATE INDEX IF NOT EXISTS inquiries_open_idx
+     ON inquiries ((answer IS NULL) DESC, created_at DESC)`,
+  `CREATE INDEX IF NOT EXISTS inquiries_from_idx
+     ON inquiries (from_clerk_id, created_at DESC)`,
+
   // ── 内部メモ（スキーマ版数など）──
   `CREATE TABLE IF NOT EXISTS app_meta (
      key   text PRIMARY KEY,

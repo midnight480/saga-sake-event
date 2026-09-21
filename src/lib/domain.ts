@@ -205,6 +205,32 @@ export const MAX_CUPS_PER_REQUEST = 3;
  */
 export const MAX_TICKET_COST = 20;
 
+/**
+ * 問い合わせの長さの上限。
+ * 文字数は Array.from で数える。日本語 1 文字を 1 文字として扱うため
+ * （length だと絵文字などで見た目と合わなくなる）。
+ */
+export const MAX_INQUIRY_SUBJECT = 100;
+export const MAX_INQUIRY_BODY = 300;
+
+/** 見た目どおりの文字数。 */
+export function countChars(text: string): number {
+  return Array.from(text).length;
+}
+
+export interface Inquiry {
+  id: number;
+  fromRole: 'brewery' | 'guest';
+  /** 誰からか（蔵名、または参加者番号）。 */
+  fromLabel: string;
+  subject: string;
+  body: string;
+  /** 主催者の返事。まだなら null。 */
+  answer: string | null;
+  answeredAt: string | null;
+  createdAt: string;
+}
+
 /** 蔵が応答しないまま何分経ったら主催者に警告を出すか。 */
 export const STALE_REQUEST_MINUTES = 12;
 

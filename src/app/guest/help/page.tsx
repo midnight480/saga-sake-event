@@ -1,5 +1,6 @@
 import { Eyebrow, ScreenHeader, Title } from '@/components/ui';
 import { HelpNote, HelpSection, HelpSteps, HelpText, HelpTroubles } from '@/components/Help';
+import { InquiryForm } from '@/components/InquiryForm';
 
 export default function GuestHelpPage() {
   return (
@@ -116,6 +117,8 @@ export default function GuestHelpPage() {
           ]}
         />
       </HelpSection>
+
+      <InquiryForm />
     </>
   );
 }

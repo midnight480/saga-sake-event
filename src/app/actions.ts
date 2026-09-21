@@ -15,6 +15,7 @@ import { clerkClient } from '@clerk/nextjs/server';
 import { AuthError, requireBrewery, requireOrganizer, requireViewer, syncRoleMetadata } from '@/lib/auth';
 import {
   type BottleSize,
+  type Inquiry,
   type EventPhase,
   type GuestKind,
   type RequestStatus,
@@ -431,6 +432,70 @@ export async function signInBrewery(
       console.error('[clerk] サインイン用の引換券を作れませんでした', error);
       return { ok: false, reason: 'ログインできませんでした。しばらく待ってお試しください。' };
     }
+  });
+}
+
+// ═════════════════════════════════════════════════════════════
+// 問い合わせ
+// ═════════════════════════════════════════════════════════════
+
+/** 蔵・参加者から主催者へ。件名は省略できる。 */
+export async function sendInquiry(input: {
+  subject: string;
+  body: string;
+}): Promise<ActionResult<{ id: number }>> {
+  return run(async () => {
+    const viewer = await requireViewer();
+    if (viewer.role === 'organizer') {
+      return { ok: false, reason: '主催者は問い合わせを送れません。' };
+    }
+
+    // 誰からの問い合わせかを、受け取った側がすぐ分かる形にしておく。
+    let label = '参加者';
+    if (viewer.role === 'brewery') {
+      const brewery = (await store.listBreweries()).find((b) => b.id === viewer.breweryId);
+      label = brewery ? brewery.name : '酒蔵';
+    } else {
+      const guest = await store.getOrCreateGuest(viewer.userId);
+      label = guest.displayNo;
+    }
+
+    const result = await store.createInquiry({
+      clerkUserId: viewer.userId,
+      role: viewer.role,
+      label,
+      breweryId: viewer.role === 'brewery' ? viewer.breweryId : undefined,
+      subject: input.subject,
+      body: input.body,
+    });
+    refresh();
+    return toAction(result);
+  });
+}
+
+/** 自分が出した問い合わせと、その返事。 */
+export async function fetchMyInquiries(): Promise<ActionResult<Inquiry[]>> {
+  return run(async () => {
+    const viewer = await requireViewer();
+    return { ok: true, value: await store.listMyInquiries(viewer.userId) };
+  });
+}
+
+/** 主催者が見る一覧。未回答が先に並ぶ。 */
+export async function fetchInquiries(): Promise<ActionResult<Inquiry[]>> {
+  return run(async () => {
+    await requireOrganizer();
+    return { ok: true, value: await store.listInquiries() };
+  });
+}
+
+/** 主催者が返事を書く。書き直しもできる。 */
+export async function replyToInquiry(id: number, answer: string): Promise<ActionResult> {
+  return run(async () => {
+    await requireOrganizer();
+    const result = await store.answerInquiry(id, answer);
+    refresh();
+    return result.ok ? { ok: true } : { ok: false, reason: result.reason };
   });
 }
 

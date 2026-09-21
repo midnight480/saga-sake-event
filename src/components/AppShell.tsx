@@ -10,6 +10,8 @@ export interface Tab {
   href: string;
   label: string;
   icon: string;
+  /** 手当てが要る件数。0 のときは出さない。 */
+  badge?: number;
 }
 
 /**
@@ -81,8 +83,13 @@ export function AppShell({
                   active ? 'text-gold-bright' : 'text-ink-45'
                 }`}
               >
-                <span aria-hidden className="text-[17px] leading-none">
+                <span aria-hidden className="relative text-[17px] leading-none">
                   {tab.icon}
+                  {!!tab.badge && (
+                    <span className="absolute -top-1.5 -right-2.5 min-w-4 rounded-full bg-terracotta px-1 text-[9px] leading-4 font-bold text-white">
+                      {tab.badge > 99 ? '99+' : tab.badge}
+                    </span>
+                  )}
                 </span>
                 <span className="max-w-full truncate px-0.5 text-[10.5px] leading-none">
                   {tab.label}
