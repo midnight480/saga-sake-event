@@ -125,6 +125,33 @@ async function ticketsOf(userId = 'u1') {
   return rows[0];
 }
 
+/** 参加者を足す。 */
+async function addGuest(userId, tickets) {
+  await pool.query(
+    `INSERT INTO guests (clerk_user_id, display_no, tickets) VALUES ($1, $2, $3)`,
+    [userId, `参加者 ${userId}`, tickets],
+  );
+}
+
+/**
+ * 注文を受渡完了にする（在庫も減らす）。
+ *
+ * 受け取るまで次を頼めない（Issue #34）ので、同じ参加者で続けて注文を
+ * 確かめたいときは、間でこれを呼ぶ。
+ */
+async function deliver(requestId) {
+  await pool.query(
+    `WITH moved AS (
+       UPDATE requests SET status = 'delivered', updated_at = now()
+       WHERE id = $1 AND status IN ('accepted', 'preparing', 'ready')
+       RETURNING item_id, cups
+     )
+     UPDATE items SET used_cups = used_cups + (SELECT cups FROM moved)
+     WHERE id = (SELECT item_id FROM moved)`,
+    [requestId],
+  );
+}
+
 async function main() {
   console.log('\n■ スキーマの適用（冪等性の確認）');
   if (!(await applySchema('1 回目'))) return;
@@ -186,10 +213,13 @@ async function main() {
   check('使ったチケット枚数が正しい（2杯 × 2枚 = 4枚）', Number(first.spent) === 4, `spent=${first.spent}`);
   check('残高が引かれている（10 − 4 = 6）', (await ticketsOf()).tickets === 6);
 
+  // 受け取るまで次を頼めないので、受け取ったことにしてから続ける。
+  await deliver(first.request_id);
   const exact = await order('u1', 'i1', 3);
   check('残高ちょうどの注文が通る（3杯 × 2枚 = 6枚）', exact.ok === true, JSON.stringify(exact));
   check('残高が 0 になっている', (await ticketsOf()).tickets === 0);
 
+  await deliver(exact.request_id);
   const broke = await order('u1', 'i1', 1);
   check('残高不足は断られる', broke.ok === false);
   check(
@@ -213,22 +243,26 @@ async function main() {
   // ── 在庫の上限 ──
   console.log('\n■ 在庫の上限');
   await seed({ bottles: 1, cupsPerBottle: 6, ticketCost: 1, tickets: 100 });
+  // 1 人が持てる未受取の注文は 1 件だけなので、在庫の上限は別々の人で確かめる。
+  for (let i = 2; i <= 11; i += 1) await addGuest(`u${i}`, 100);
 
   let placed = 0;
-  for (let i = 0; i < 10; i += 1) {
-    const result = await order('u1', 'i1', 1);
+  for (let i = 1; i <= 10; i += 1) {
+    const result = await order(`u${i}`, 'i1', 1);
     if (result.ok) placed += 1;
   }
   check('在庫（6 杯）を超えて注文できない', placed === 6, `通った件数=${placed}`);
 
-  const over = await order('u1', 'i1', 1);
+  const over = await order('u11', 'i1', 1);
   check('売り切れの理由を伝える', over.ok === false && over.reason.includes('埋まりました'), `reason=${over.reason}`);
 
   const tooMany = await (async () => {
     await seed({ bottles: 1, cupsPerBottle: 6, ticketCost: 1, tickets: 100 });
+    await addGuest('u2', 100);
+    await addGuest('u3', 100);
     await order('u1', 'i1', 3);
-    await order('u1', 'i1', 3);
-    return order('u1', 'i1', 2); // 残り 0
+    await order('u2', 'i1', 3);
+    return order('u3', 'i1', 2); // 残り 0
   })();
   check('残りより多い杯数は断られる', tooMany.ok === false, `reason=${tooMany.reason}`);
 
@@ -257,6 +291,58 @@ async function main() {
     `SELECT count(*)::int AS n FROM guests WHERE used > 0`,
   );
   check('チケットが引かれたのも 1 人だけ', spentRows[0].n === 1, `人数=${spentRows[0].n}`);
+
+  // ── 受け取るまで次を頼めない（Issue #34）──
+  console.log('\n■ 受け取るまで次を頼めない');
+  await seed({ bottles: 5, cupsPerBottle: 6, ticketCost: 1, tickets: 100 });
+  await pool.query(
+    `INSERT INTO items (id, brewery_id, name, size, cups_per_bottle, bottles, ticket_cost)
+     VALUES ('i2', 'b1', 'テスト吟醸', '四合瓶', 6, 5, 1),
+            ('i3', 'b1', 'テスト大吟醸', '四合瓶', 6, 5, 1)`,
+  );
+
+  const firstOrder = await order('u1', 'i1', 1);
+  check('1 件目は通る', firstOrder.ok === true, JSON.stringify(firstOrder));
+
+  // 未受取の 3 つの状態すべてで止まること。「準備完了」は蔵の手を離れているが、
+  // 参加者はまだ受け取っていない。ここを取りこぼすと制約の意味がなくなる。
+  for (const state of ['accepted', 'preparing', 'ready']) {
+    await pool.query(`UPDATE requests SET status = $2 WHERE id = $1`, [firstOrder.request_id, state]);
+    const blocked = await order('u1', 'i2', 1);
+    check(
+      `「${state}」のあいだは、別の銘柄でも次を頼めない`,
+      blocked.ok === false && blocked.reason.includes('まだ受け取っていない'),
+      `reason=${blocked.reason}`,
+    );
+  }
+  check('断られたぶんのポイントは引かれていない（100 − 1 = 99）', (await ticketsOf()).tickets === 99);
+
+  await deliver(firstOrder.request_id);
+  const afterDelivered = await order('u1', 'i2', 1);
+  check('受け取ったら次を頼める', afterDelivered.ok === true, JSON.stringify(afterDelivered));
+
+  await pool.query(`UPDATE requests SET status = 'cancelled' WHERE id = $1`, [afterDelivered.request_id]);
+  const afterCancelled = await order('u1', 'i3', 1);
+  check('キャンセルされた注文は数えない', afterCancelled.ok === true, JSON.stringify(afterCancelled));
+
+  // 同じ人が 2 台の端末から同時に押す。参加者の行のロックで直列になり、
+  // 2 本目以降はロックが空いたあとの文で 1 本目が見えて止まるはず。
+  await seed({ bottles: 5, cupsPerBottle: 6, ticketCost: 2, tickets: 100 });
+  await pool.query(
+    `INSERT INTO items (id, brewery_id, name, size, cups_per_bottle, bottles, ticket_cost)
+     VALUES ('i2', 'b1', 'テスト吟醸', '四合瓶', 6, 5, 2),
+            ('i3', 'b1', 'テスト大吟醸', '四合瓶', 6, 5, 2)`,
+  );
+  const burst = await Promise.all(
+    Array.from({ length: 9 }, (_, i) => order('u1', ['i1', 'i2', 'i3'][i % 3], 1)),
+  );
+  const burstWins = burst.filter((r) => r.ok).length;
+  check('同じ人が 9 本同時に送っても、通るのは 1 件だけ', burstWins === 1, `通った件数=${burstWins}`);
+  const { rows: burstRows } = await pool.query(
+    `SELECT count(*)::int AS n FROM requests WHERE guest_clerk_id = 'u1'`,
+  );
+  check('注文の行も 1 件だけ', burstRows[0].n === 1, `件数=${burstRows[0].n}`);
+  check('ポイントも 1 件ぶん（2）しか引かれていない', (await ticketsOf()).tickets === 98);
 
   // ── 受渡とキャンセル ──
   console.log('\n■ 受渡・キャンセル');

@@ -536,7 +536,7 @@ function Rehearsal() {
         onCancel={() => setConfirming(false)}
         pending={pending}
       >
-        実在する佐賀の酒蔵 3 蔵と、その銘柄 9 件、参加者 3 名、注文 9 件を作ります。
+        実在する佐賀の酒蔵 3 蔵と、その銘柄 9 件、参加者 6 名、注文 9 件を作ります。
         蔵のログインアカウントも本番と同じ手順で作られます。
         {already && (
           <>

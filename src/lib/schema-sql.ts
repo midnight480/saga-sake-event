@@ -211,6 +211,20 @@ export const STATEMENTS: string[] = [
        RETURN;
      END IF;
 
+     -- まだ受け取っていない注文があれば、次は出させない（Issue #34）。
+     -- 参加者の行をロックしたあとで確かめるのが要。2 台の端末から同時に
+     -- 押されても、2 本目はロックが空くのを待ち、そのあとの文で 1 本目の
+     -- 注文が見えるので、ここで止まる。domain.ts の UNDELIVERED_STATUSES と同じ。
+     IF EXISTS (
+       SELECT 1 FROM requests
+        WHERE guest_clerk_id = p_user AND status IN ('accepted', 'preparing', 'ready')
+     ) THEN
+       RETURN QUERY SELECT false,
+         'まだ受け取っていないリクエストがあります。受け取ってから次をお選びください。'::text,
+         NULL::bigint, NULL::integer;
+       RETURN;
+     END IF;
+
      IF v_tickets < v_spend THEN
        RETURN QUERY SELECT false,
          format('ポイントが %s 足りません。', v_spend - v_tickets)::text,

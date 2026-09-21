@@ -158,6 +158,30 @@ export function canTransition(from: RequestStatus, to: RequestStatus): boolean {
 /** 対応待ち = 蔵がまだ渡し終えていないもの。 */
 export const OPEN_STATUSES: RequestStatus[] = ['accepted', 'preparing'];
 
+/**
+ * 参加者がまだ受け取っていない注文。
+ *
+ * OPEN_STATUSES と違って「準備完了 受取可」も含む。蔵から見れば手は離れて
+ * いるが、参加者の手元にはまだ届いていないので。
+ *
+ * これが 1 件でもある参加者は、次の注文を出せない（Issue #34）。受け取りに
+ * 来ないまま次々と頼まれると、蔵の前に杯が並んで取り違えが起きるため。
+ * place_order（schema-sql.ts）も同じ 3 つを見ている。ずらさないこと。
+ */
+export const UNDELIVERED_STATUSES: RequestStatus[] = ['accepted', 'preparing', 'ready'];
+
+/** その参加者のまだ受け取っていない注文。無ければ null。 */
+export function undeliveredRequestOf(
+  requests: OrderRequest[],
+  guestClerkId: string,
+): OrderRequest | null {
+  return (
+    requests.find(
+      (r) => r.guestClerkId === guestClerkId && UNDELIVERED_STATUSES.includes(r.status),
+    ) ?? null
+  );
+}
+
 // ─────────────────────────────────────────────────────────────
 // 銘柄の設定候補（持ち込み登録で「種類」を選ぶと自動で入る値）
 // ─────────────────────────────────────────────────────────────
@@ -196,7 +220,10 @@ export const BOOTHS = [
   'C-01', 'C-02', 'C-03', 'C-04', 'C-05', 'C-06',
 ] as const;
 
-/** 一度に頼める杯数の上限。 */
+/**
+ * 一度に頼める杯数の上限（Issue #34）。
+ * 受け取るまで次を頼めないので、手元に同時に来るのも最大でこの杯数になる。
+ */
 export const MAX_CUPS_PER_REQUEST = 3;
 
 /**
