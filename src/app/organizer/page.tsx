@@ -131,7 +131,7 @@ export default function OrganizerDashboard() {
             <BreweryRow
               key={brewery.id}
               brewery={brewery}
-              waiting={waitingCount(requests, brewery.id)}
+              waiting={waitingCount(snapshot.waitingByBrewery, brewery.id)}
             />
           ))
         )}

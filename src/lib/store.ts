@@ -638,6 +638,7 @@ function toRequest(row: Record<string, unknown>): OrderRequest {
 }
 
 /** 当日分の注文をすべて返す。会場の全画面がこの 1 本を共有して見る。 */
+/** 全員の注文。主催者の画面だけが使う（getSnapshot 参照）。 */
 export async function listRequests(): Promise<OrderRequest[]> {
   const sql = await db();
   const rows = (await sql`
@@ -648,6 +649,61 @@ export async function listRequests(): Promise<OrderRequest[]> {
     LIMIT 2000
   `) as Record<string, unknown>[];
   return rows.map(toRequest);
+}
+
+/**
+ * その参加者の注文だけ。件数の上限は付けない。
+ *
+ * 以前は全員分の新しい順 2,000 件から画面で絞っていたので、イベント全体の
+ * 注文が 2,000 件を超えると、古い自分の注文が「記録」から消えていた。
+ */
+export async function listRequestsForGuest(clerkUserId: string): Promise<OrderRequest[]> {
+  const sql = await db();
+  const rows = (await sql`
+    SELECT id, guest_clerk_id, guest_label, brewery_id, item_id, brand,
+           cups, ticket_cost, status, created_at, updated_at
+    FROM requests
+    WHERE guest_clerk_id = ${clerkUserId}
+    ORDER BY created_at DESC
+  `) as Record<string, unknown>[];
+  return rows.map(toRequest);
+}
+
+/**
+ * その蔵の注文だけ。
+ *
+ * 蔵は受付キューで「参加者 #10482」と呼び出すので番号は要るが、参加者の
+ * Clerk の内部 ID は要らない。渡さない。
+ */
+export async function listRequestsForBrewery(breweryId: string): Promise<OrderRequest[]> {
+  const sql = await db();
+  const rows = (await sql`
+    SELECT id, guest_clerk_id, guest_label, brewery_id, item_id, brand,
+           cups, ticket_cost, status, created_at, updated_at
+    FROM requests
+    WHERE brewery_id = ${breweryId}
+    ORDER BY created_at DESC
+    LIMIT 2000
+  `) as Record<string, unknown>[];
+  return rows.map((row) => ({ ...toRequest(row), guestClerkId: '' }));
+}
+
+/**
+ * 蔵ごとの「待ち」の件数。誰の注文かは含めず、数だけ。
+ *
+ * 参加者の一覧の混み具合に使う。以前は全員の注文を参加者の端末へ送り、
+ * 画面で数えていた。数えるだけなら中身は要らないので、ここで数えて返す。
+ * 数える状態は domain.ts の OPEN_STATUSES（受付済・準備中）と同じにすること。
+ */
+export async function countWaitingByBrewery(): Promise<Record<string, number>> {
+  const sql = await db();
+  const rows = (await sql`
+    SELECT brewery_id, count(*)::int AS n
+    FROM requests
+    WHERE status IN ('accepted', 'preparing')
+    GROUP BY brewery_id
+  `) as { brewery_id: string; n: number }[];
+  return Object.fromEntries(rows.map((r) => [r.brewery_id, Number(r.n)]));
 }
 
 /**
@@ -1031,36 +1087,75 @@ export async function answerInquiry(id: number, answer: string): Promise<Result>
 
 export interface Snapshot {
   event: EventSettings;
+  /** 酒蔵。主催者以外には、蔵のログイン ID とアカウントの有無を空にして返す。 */
   breweries: Brewery[];
+  /**
+   * 注文。見ている人の役割で中身が違う（Issue #39）。
+   * 主催者は全員分、蔵は自分の蔵の分、参加者は自分の分だけ。
+   */
   requests: OrderRequest[];
+  /** 蔵ごとの待ち件数（受付済・準備中）。誰の注文かは含まない。 */
+  waitingByBrewery: Record<string, number>;
+  /** 券種。主催者だけ。ほかの役割には空で返す。 */
   batches: TicketBatch[];
   guest: Guest | null;
-  /** まだ返事をしていない問い合わせの件数。 */
+  /** まだ返事をしていない問い合わせの件数。主催者だけ。ほかの役割には 0。 */
   openInquiries: number;
   /** 見ている本人の、まだ読んでいないお知らせの件数（右上の 🔔）。 */
   unreadNotices: number;
   serverTime: string;
 }
 
+/** 誰が見ているか。返す中身をここで決める。 */
+export type SnapshotScope =
+  | { role: 'organizer'; userId: string }
+  | { role: 'brewery'; userId: string; breweryId: string }
+  | { role: 'guest'; userId: string };
+
 /**
- * @param guestUserId 参加者として見ているときだけ渡す。残高を混ぜて返す。
- * @param viewerUserId ログインしている人なら役割を問わず渡す。🔔 の未読数に使う。
+ * 会場の現在値を、見ている人の役割に合わせて組み立てる（Issue #39）。
+ *
+ * ★ 画面で絞るのではなく、ここで絞る ★
+ * 以前は全員分を返し、画面の側で自分の分だけを表示していた。通信の中身には
+ * 全部入っていたので、ほかの参加者の注文も、蔵のログイン ID も取り出せた。
+ * 参加者の記録は、本人が見て、SNS に載せるかどうかを本人が決めるもの。
+ * 見せてよいものだけを、そもそも送らない。
  */
-export async function getSnapshot(guestUserId?: string, viewerUserId?: string): Promise<Snapshot> {
-  const [event, breweries, requests, batches, openInquiries, unreadNotices] = await Promise.all([
-    getEvent(),
-    listBreweries(),
-    listRequests(),
-    listTicketBatches(),
-    countOpenInquiries(),
-    viewerUserId ? countUnreadNotices(viewerUserId) : Promise.resolve(0),
-  ]);
+export async function getSnapshot(scope: SnapshotScope): Promise<Snapshot> {
+  const organizer = scope.role === 'organizer';
+
+  const requestsFor = (): Promise<OrderRequest[]> => {
+    switch (scope.role) {
+      case 'organizer':
+        return listRequests();
+      case 'brewery':
+        return listRequestsForBrewery(scope.breweryId);
+      case 'guest':
+        return listRequestsForGuest(scope.userId);
+    }
+  };
+
+  const [event, breweries, requests, waitingByBrewery, batches, openInquiries, unreadNotices] =
+    await Promise.all([
+      getEvent(),
+      listBreweries(),
+      requestsFor(),
+      countWaitingByBrewery(),
+      organizer ? listTicketBatches() : Promise.resolve([] as TicketBatch[]),
+      organizer ? countOpenInquiries() : Promise.resolve(0),
+      countUnreadNotices(scope.userId),
+    ]);
+
   return {
     event,
-    breweries,
+    // 蔵のログイン ID はパスワードと組になる片方。主催者以外には渡さない。
+    breweries: organizer
+      ? breweries
+      : breweries.map((b) => ({ ...b, loginId: '', hasLoginAccount: false })),
     requests,
+    waitingByBrewery,
     batches,
-    guest: guestUserId ? await getOrCreateGuest(guestUserId) : null,
+    guest: scope.role === 'guest' ? await getOrCreateGuest(scope.userId) : null,
     openInquiries,
     unreadNotices,
     serverTime: new Date().toISOString(),

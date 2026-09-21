@@ -37,7 +37,7 @@ export default function BreweryQueuePage() {
       return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
     });
 
-  const waiting = waitingCount(snapshot.requests, breweryId);
+  const waiting = waitingCount(snapshot.waitingByBrewery, breweryId);
 
   const toggleAccepting = () => {
     setError(null);

@@ -17,7 +17,7 @@ export default function GuestBreweryListPage() {
 
   if (isInitialLoading || !snapshot) return <Empty>読み込んでいます…</Empty>;
 
-  const { breweries, requests } = snapshot;
+  const { breweries, waitingByBrewery } = snapshot;
   const tickets = snapshot.guest?.tickets ?? 0;
 
   // いま頼める蔵が何軒あるかを先に出す。残高が足りないまま歩き回らせない。
@@ -51,7 +51,7 @@ export default function GuestBreweryListPage() {
               key={brewery.id}
               brewery={brewery}
               tickets={tickets}
-              waiting={waitingCount(requests, brewery.id)}
+              waiting={waitingCount(waitingByBrewery, brewery.id)}
             />
           ))
         )}
