@@ -176,11 +176,20 @@ export function generatePassword(): string {
   return out;
 }
 
-/** 次の蔵 ID（kura-001, kura-002 …）。欠番は埋めず、常に最大値 +1。 */
+/**
+ * 次の蔵 ID（kura-001, kura-002 …）。欠番は埋めず、常に最大値 +1。
+ *
+ * ★ 数字の取り出しに \D を使ってはいけない ★
+ * JavaScript のテンプレートリテラルでは \D がただの D になるため、
+ * SQL に渡るのは regexp_replace(login_id, 'D', '', 'g') になってしまう。
+ * 数字以外が消えず、'kura-001' を整数に変換しようとして落ちる。
+ * 1 蔵目は対象の行が無いので通り、2 蔵目で必ず失敗していた。
+ * バックスラッシュを含まない [^0-9] で書く。
+ */
 async function nextLoginId(): Promise<string> {
   const sql = await db();
   const rows = (await sql`
-    SELECT COALESCE(MAX(NULLIF(regexp_replace(login_id, '\D', '', 'g'), '')::int), 0) AS n
+    SELECT COALESCE(MAX(NULLIF(regexp_replace(login_id, '[^0-9]', '', 'g'), '')::int), 0) AS n
     FROM breweries
   `) as { n: number }[];
   return `kura-${String(Number(rows[0]?.n ?? 0) + 1).padStart(3, '0')}`;

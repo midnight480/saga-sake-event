@@ -94,3 +94,6 @@ next-env.d.ts
 .env*.local
 .vercel
 tsconfig.tsbuildinfo
+
+# 作業用の控え（発行した蔵IDとパスワードなど。絶対に commit しない）
+.scratch/

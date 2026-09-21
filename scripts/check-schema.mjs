@@ -146,6 +146,35 @@ async function main() {
   console.log('\n■ 本番コード中の SQL を実スキーマに照合');
   await checkInlineSql();
 
+  // ── 蔵IDの採番 ──
+  console.log('\n■ 蔵IDの採番');
+  await pool.query('TRUNCATE requests, items, breweries RESTART IDENTITY CASCADE');
+
+  // 数字の取り出しに \\D を使うと、JS のテンプレートリテラルで D になってしまい、
+  // 2 蔵目で 'kura-001' を整数に変換しようとして落ちる。実際に起きた不具合。
+  const nextLoginId = async () => {
+    const { rows } = await pool.query(
+      `SELECT COALESCE(MAX(NULLIF(regexp_replace(login_id, '[^0-9]', '', 'g'), '')::int), 0) AS n
+       FROM breweries`,
+    );
+    return `kura-${String(Number(rows[0].n) + 1).padStart(3, '0')}`;
+  };
+
+  const issued = [];
+  for (let i = 0; i < 3; i += 1) {
+    const loginId = await nextLoginId();
+    issued.push(loginId);
+    await pool.query(
+      `INSERT INTO breweries (id, name, login_id) VALUES ($1, $2, $3)`,
+      [`b${i}`, `蔵${i}`, loginId],
+    );
+  }
+  check(
+    '3 蔵つづけて登録でき、番号が連番になる',
+    JSON.stringify(issued) === JSON.stringify(['kura-001', 'kura-002', 'kura-003']),
+    issued.join(', '),
+  );
+
   // ── 注文処理 ──
   console.log('\n■ 注文処理（place_order）');
 
