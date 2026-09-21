@@ -10,6 +10,7 @@
  */
 
 import { revalidatePath } from 'next/cache';
+import { after } from 'next/server';
 import { clerkClient } from '@clerk/nextjs/server';
 
 import { AuthError, requireBrewery, requireOrganizer, requireViewer, syncRoleMetadata } from '@/lib/auth';
@@ -326,6 +327,21 @@ export async function setRequestStatus(
 
     const result = await store.setRequestStatus(requestId, to, guard);
     refresh();
+
+    // できあがったら、頼んだ本人のスマホに知らせる（Issue #35）。
+    // 送信は応答のあとに回す。通知の配信サービスが遅くても、蔵の画面を
+    // 待たせないため。after() はその間 関数を生かしておいてくれる。
+    if (result.ok && to === 'ready') {
+      after(async () => {
+        try {
+          const { sendReadyNotice } = await import('@/lib/push');
+          await sendReadyNotice(requestId);
+        } catch (error) {
+          console.error('[push] 準備完了の通知に失敗しました', error);
+        }
+      });
+    }
+
     return result.ok ? { ok: true } : { ok: false, reason: result.reason };
   });
 }

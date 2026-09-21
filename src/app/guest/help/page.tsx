@@ -11,7 +11,7 @@ export default function GuestHelpPage() {
         <Title>使い方</Title>
       </ScreenHeader>
 
-      <PushSettings />
+      <PushSettings extraReasons={['注文したお酒ができあがったとき']} />
 
       <HelpSection title="はじめ方">
         <HelpSteps

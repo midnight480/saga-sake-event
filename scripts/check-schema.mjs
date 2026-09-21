@@ -57,7 +57,7 @@ async function applySchema(round) {
  * だけで実際には動くため、失敗とみなさない。
  */
 async function checkInlineSql() {
-  const files = ['src/lib/store.ts', 'src/lib/auth.ts', 'src/lib/setup-state.ts'];
+  const files = ['src/lib/store.ts', 'src/lib/auth.ts', 'src/lib/setup-state.ts', 'src/lib/push.ts'];
   const fatal = new Set(['42601', '42703', '42P01', '42883', '42704']);
   const starts = /^\s*(WITH|SELECT|INSERT|UPDATE|DELETE)\b/i;
 

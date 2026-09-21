@@ -111,20 +111,28 @@ export async function hasSubscription(clerkUserId: string): Promise<boolean> {
   return rows.length > 0;
 }
 
+/** 通知の中身。sw.js がこの形を受け取って表示する。 */
+interface NoticePayload {
+  title: string;
+  body: string;
+  /** 押したときに開く画面。 */
+  url: string;
+  /** 同じ tag の通知は重ならず、新しいほうに置き換わる。 */
+  tag?: string;
+}
+
 /**
- * 全員に送る。
+ * 決まった宛先に送る。
  * 宛先が無効になっていたら（端末が消えた、許可を取り消した）その行を消す。
  */
-async function sendToAll(title: string, body: string, url: string): Promise<number> {
+async function sendTo(targets: PushTarget[], notice: NoticePayload): Promise<number> {
+  if (targets.length === 0) return 0;
+
   const sql = await db();
   const keys = await vapidKeys();
   webpush.setVapidDetails(CONTACT, keys.publicKey, keys.privateKey);
 
-  const targets = (await sql`
-    SELECT endpoint, p256dh, auth FROM push_subscriptions
-  `) as PushTarget[];
-
-  const payload = JSON.stringify({ title, body, url });
+  const payload = JSON.stringify(notice);
   const dead: string[] = [];
   let sent = 0;
 
@@ -148,6 +156,51 @@ async function sendToAll(title: string, body: string, url: string): Promise<numb
     await sql`DELETE FROM push_subscriptions WHERE endpoint = ANY(${dead}::text[])`;
   }
   return sent;
+}
+
+/** 登録している全員に送る。節目のお知らせで使う。 */
+async function sendToAll(title: string, body: string, url: string): Promise<number> {
+  const sql = await db();
+  const targets = (await sql`
+    SELECT endpoint, p256dh, auth FROM push_subscriptions
+  `) as PushTarget[];
+  return sendTo(targets, { title, body, url });
+}
+
+/**
+ * 注文したお酒ができあがったことを、頼んだ本人の端末にだけ知らせる（Issue #35）。
+ *
+ * 画面の文言は 4 秒ごとに変わるが、スマホをポケットに入れていれば気づけない。
+ * 蔵の前に杯が置かれたままになると、取り違えや温度の変化が起きる。
+ *
+ * 呼ぶのは、蔵が「準備完了」に進めるのに成功したときだけ（actions.ts）。
+ * 状態の更新は「いまの状態が準備中なら」を条件にした 1 文なので、同じ注文で
+ * 2 回成功することはなく、二重には届かない。
+ */
+export async function sendReadyNotice(requestId: number): Promise<number> {
+  const sql = await db();
+  const rows = (await sql`
+    SELECT r.guest_clerk_id, r.brand, r.cups, b.name AS brewery_name
+    FROM requests r
+    JOIN breweries b ON b.id = r.brewery_id
+    WHERE r.id = ${requestId} AND r.status = 'ready'
+  `) as { guest_clerk_id: string; brand: string; cups: number; brewery_name: string }[];
+
+  // 送る前に取り消された、など。できあがっていないものは知らせない。
+  const request = rows[0];
+  if (!request) return 0;
+
+  const targets = (await sql`
+    SELECT endpoint, p256dh, auth FROM push_subscriptions
+    WHERE clerk_user_id = ${request.guest_clerk_id}
+  `) as PushTarget[];
+
+  return sendTo(targets, {
+    title: 'できあがりました',
+    body: `${request.brewery_name}の「${request.brand}」（${request.cups} 杯）を、ブースで受け取ってください。`,
+    url: '/guest',
+    tag: `ready-${requestId}`,
+  });
 }
 
 /**
