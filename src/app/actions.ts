@@ -615,6 +615,97 @@ export async function setTicketCount(
 }
 
 /**
+ * 予行演習用のデータを入れる。
+ *
+ * 当日と同じ形のデータを一度に作って、画面の見え方と流れを確かめるためのもの。
+ * 空の画面を眺めても、混雑の色や在庫のバー、応答遅延の警告がどう出るかは
+ * 分からない。実在する佐賀の酒蔵と銘柄を使っているのも、当日の感覚を掴む
+ * ためである。
+ *
+ * 蔵のログインアカウントは本番と同じ手順で作るので、発行された蔵IDと
+ * パスワードでそのままログインして試せる。
+ */
+export async function seedRehearsalData(): Promise<
+  ActionResult<{
+    breweries: { name: string; loginId: string; password: string; accountReady: boolean }[];
+    items: number;
+    guests: number;
+    orders: number;
+  }>
+> {
+  return run(async () => {
+    await requireOrganizer();
+
+    const { REHEARSAL_BREWERIES, REHEARSAL_GUESTS, REHEARSAL_ORDERS } = await import(
+      '@/lib/rehearsal'
+    );
+
+    const created: {
+      id: string;
+      name: string;
+      loginId: string;
+      password: string;
+      accountReady: boolean;
+      itemIds: string[];
+    }[] = [];
+
+    for (const spec of REHEARSAL_BREWERIES) {
+      const brewery = await store.createBrewery({ name: spec.name });
+      if (!brewery.ok) return { ok: false, reason: `${spec.name}: ${brewery.reason}` };
+
+      const { id, loginId, password } = brewery.value;
+      const account = await createBreweryAccount(id, loginId, password);
+      const itemIds = await store.seedItems(id, spec.items);
+
+      if (spec.paused) await store.setAccepting(id, false);
+
+      created.push({ id, name: spec.name, loginId, password, accountReady: account.ok, itemIds });
+    }
+
+    for (const guest of REHEARSAL_GUESTS) {
+      await store.seedGuest(guest.id, guest.label, guest.points);
+    }
+
+    let orders = 0;
+    for (const order of REHEARSAL_ORDERS) {
+      const brewery = created[order.brewery];
+      const spec = REHEARSAL_BREWERIES[order.brewery].items[order.item];
+      const guest = REHEARSAL_GUESTS[order.guest];
+      if (!brewery || !spec || !guest) continue;
+
+      await store.seedRequest({
+        guestClerkId: guest.id,
+        guestLabel: guest.label,
+        breweryId: brewery.id,
+        itemId: brewery.itemIds[order.item],
+        brand: spec.name,
+        cups: order.cups,
+        ticketCost: spec.ticketCost * order.cups,
+        status: order.status,
+        minutesAgo: order.minutesAgo,
+      });
+      orders += 1;
+    }
+
+    refresh();
+    return {
+      ok: true,
+      value: {
+        breweries: created.map(({ name, loginId, password, accountReady }) => ({
+          name,
+          loginId,
+          password,
+          accountReady,
+        })),
+        items: created.reduce((sum, b) => sum + b.itemIds.length, 0),
+        guests: REHEARSAL_GUESTS.length,
+        orders,
+      },
+    };
+  });
+}
+
+/**
  * 次のイベントのために片付ける。
  * 何が消えて何が残るかは store.resetEvent に書いてある。
  */
