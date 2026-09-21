@@ -1,7 +1,8 @@
 'use client';
 
+import { useState } from 'react';
+
 import {
-  Card,
   Empty,
   Eyebrow,
   Note,
@@ -49,8 +50,8 @@ export default function GuestRecordPage() {
         <Stat label="杯" value={conquest.cups} />
       </div>
 
-      <SectionLabel>酒蔵ごとの制覇</SectionLabel>
-      <div className="flex flex-col gap-3 px-5">
+      <SectionLabel>酒蔵ごとの制覇（押すと銘柄が開きます）</SectionLabel>
+      <div className="flex flex-col gap-2 px-5">
         {conquest.breweries.length === 0 ? (
           <Empty>まだ銘柄を登録している蔵がありません。</Empty>
         ) : (
@@ -104,49 +105,69 @@ function Stat({ label, value, total }: { label: string; value: number; total?: n
   );
 }
 
+/**
+ * 酒蔵ごとの制覇。初めは蔵名と「何銘柄中いくつ」だけを並べ、銘柄は畳む（Issue #46）。
+ *
+ * 参加者がまず知りたいのは「どれだけ制覇したか」。銘柄まで全部並べると、
+ * 蔵が多いほど縦に長くなって全体が見渡せない。蔵の行を押すと、その蔵の銘柄が開く。
+ * 開閉のボタンを別に置くと 1 蔵ごとに行が増えるので、行そのものを押せるようにした。
+ */
 function BreweryRow({ conquest }: { conquest: BreweryConquest }) {
   const { brewery, items, conquered } = conquest;
+  const [open, setOpen] = useState(false);
   const percent = items.length > 0 ? Math.round((conquered / items.length) * 100) : 0;
   const complete = conquered === items.length;
 
   return (
-    <Card>
-      <div className="flex items-baseline justify-between gap-2">
-        <span className="min-w-0 truncate font-display text-[17px] text-ink">{brewery.name}</span>
-        <span
-          className={`flex-none text-[12px] leading-none whitespace-nowrap ${
-            complete ? 'font-bold text-gold' : 'text-ink-55'
-          }`}
-        >
-          {complete ? '制覇！ ' : ''}
-          {conquered} / {items.length} 銘柄
-        </span>
-      </div>
-
-      {/* 在庫の StockBar は「残りが少ないと赤」の意味なので使わない。進み具合は金一色。 */}
-      <div
-        className="h-1.5 overflow-hidden rounded-sm bg-ink/10"
-        role="img"
-        aria-label={`${items.length} 銘柄中 ${conquered} 銘柄`}
+    <div className="overflow-hidden rounded-card border border-hairline bg-card">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className="flex min-h-14 w-full flex-col gap-2 px-4 py-3 text-left transition-colors hover:bg-ink/5"
       >
-        <div className="h-full rounded-sm bg-gold" style={{ width: `${percent}%` }} />
-      </div>
+        <span className="flex w-full items-baseline justify-between gap-2">
+          <span className="min-w-0 truncate font-display text-[16px] text-ink">{brewery.name}</span>
+          <span className="flex flex-none items-baseline gap-2 whitespace-nowrap">
+            <span
+              className={`text-[12px] leading-none ${complete ? 'font-bold text-gold' : 'text-ink-55'}`}
+            >
+              {complete ? '制覇！ ' : ''}
+              {conquered} / {items.length} 銘柄
+            </span>
+            <span aria-hidden className="text-[10px] leading-none text-ink-45">
+              {open ? '▲' : '▼'}
+            </span>
+          </span>
+        </span>
 
-      <ul className="flex flex-col gap-1.5">
-        {items.map(({ item, cups }) => (
-          <li key={item.id} className="flex items-center justify-between gap-2 text-[12.5px]">
-            <span className={`min-w-0 truncate ${cups > 0 ? 'text-ink' : 'text-ink-45'}`}>
-              <span aria-hidden className={cups > 0 ? 'text-gold' : 'text-ink-45'}>
-                {cups > 0 ? '✓ ' : '・ '}
+        {/* 在庫の StockBar は「残りが少ないと赤」の意味なので使わない。進み具合は金一色。 */}
+        <span
+          className="block h-1.5 w-full overflow-hidden rounded-sm bg-ink/10"
+          role="img"
+          aria-label={`${items.length} 銘柄中 ${conquered} 銘柄`}
+        >
+          <span className="block h-full rounded-sm bg-gold" style={{ width: `${percent}%` }} />
+        </span>
+      </button>
+
+      {open && (
+        <ul className="flex flex-col gap-1.5 border-t border-hairline px-4 py-3">
+          {items.map(({ item, cups }) => (
+            <li key={item.id} className="flex items-center justify-between gap-2 text-[12.5px]">
+              <span className={`min-w-0 truncate ${cups > 0 ? 'text-ink' : 'text-ink-45'}`}>
+                <span aria-hidden className={cups > 0 ? 'text-gold' : 'text-ink-45'}>
+                  {cups > 0 ? '✓ ' : '・ '}
+                </span>
+                {item.name}
               </span>
-              {item.name}
-            </span>
-            <span className="flex-none text-[11.5px] leading-none text-ink-55">
-              {cups > 0 ? `${cups} 杯` : 'まだ'}
-            </span>
-          </li>
-        ))}
-      </ul>
-    </Card>
+              <span className="flex-none text-[11.5px] leading-none text-ink-55">
+                {cups > 0 ? `${cups} 杯` : 'まだ'}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   );
 }

@@ -118,6 +118,7 @@ export default function GuestHelpPage() {
         <HelpText>
           上のメニューの<strong className="text-ink">「記録」</strong>で、どの蔵のどの銘柄を何杯いただいたかと、
           これまでの注文を時刻つきで見られます。数えるのは受け取ったお酒だけです。
+          蔵の行を押すと、その蔵の銘柄が開きます。
         </HelpText>
       </HelpSection>
 
