@@ -281,14 +281,14 @@ function Scanner({ onDetect, disabled }: { onDetect: (code: string) => void; dis
                 <br />
                 ブラウザの設定で許可するか、
                 <br />
-                下の欄にコードを入力してください。
+                上の欄にコードを入力してください。
               </span>
             )}
             {state === 'unsupported' && (
               <span>
                 この端末ではカメラを使えませんでした。
                 <br />
-                下の欄にコードを入力してください。
+                上の欄にコードを入力してください。
               </span>
             )}
           </div>

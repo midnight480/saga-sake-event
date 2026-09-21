@@ -46,6 +46,9 @@
 
 /* ─── 素の要素 ─── */
 html {
+  /* 上に固定したヘッダとメニューの下に、入力欄や見出しが潜り込まないようにする。
+     入力欄を押したときや、ページ内の場所へ飛んだときに効く。 */
+  scroll-padding-top: calc(7rem + env(safe-area-inset-top));
   background: var(--color-sumi);
   /* iOS Safari のプルダウン跳ね返りで白が見えるのを防ぐ */
   background-color: var(--color-sumi);

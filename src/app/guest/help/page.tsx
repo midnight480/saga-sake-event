@@ -19,7 +19,7 @@ export default function GuestHelpPage() {
             <>会場の受付で券をお受け取りください。</>,
             <>
               券の <strong className="text-ink">QR をスマートフォンのカメラで読み取ります</strong>。
-              カメラが使えないときは、下の「チケット」を開いて、QR の下のコードを入れます。
+              カメラが使えないときは、上のメニューの「チケット」を開いて、QR の下のコードを入れます。
             </>,
             <>
               <strong className="text-ink">ポイント</strong>が入ります。このポイントで
@@ -107,7 +107,7 @@ export default function GuestHelpPage() {
 
       <HelpSection title="記録を見る">
         <HelpText>
-          下の<strong className="text-ink">「記録」</strong>で、どの蔵のどの銘柄を何杯いただいたかと、
+          上のメニューの<strong className="text-ink">「記録」</strong>で、どの蔵のどの銘柄を何杯いただいたかと、
           これまでの注文を時刻つきで見られます。数えるのは受け取ったお酒だけです。
         </HelpText>
       </HelpSection>
@@ -119,7 +119,7 @@ export default function GuestHelpPage() {
               when: 'ポイントが足りない',
               then: (
                 <>
-                  受付で券を追加でお求めください。下の「チケット」から、新しい券のコードを
+                  受付で券を追加でお求めください。上のメニューの「チケット」から、新しい券のコードを
                   入れるとポイントが増えます。
                 </>
               ),

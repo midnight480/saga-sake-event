@@ -72,7 +72,7 @@ src/
     useSnapshot.ts 会場の現在値を 4 秒ごとに購読するフック
   components/
     ui.tsx           画面部品。色と余白はここに閉じ込める
-    AppShell.tsx     3 役割共通の外枠（ヘッダ・下タブ）
+    AppShell.tsx     3 役割共通の外枠（ヘッダと、上に固定したメニュー）
     Help.tsx         ヘルプの部品
     InquiryForm.tsx  主催者への問い合わせ
     PushSettings.tsx お知らせの受け取り設定
