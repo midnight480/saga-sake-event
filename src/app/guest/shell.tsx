@@ -8,6 +8,7 @@ const TABS: Tab[] = [
   { href: '/guest', label: 'マイページ', icon: '◉' },
   { href: '/guest/breweries', label: '酒蔵をさがす', icon: '☷' },
   { href: '/guest/charge', label: 'チケット', icon: '＋' },
+  { href: '/guest/help', label: 'ヘルプ', icon: '？' },
 ];
 
 export function GuestShell({ children }: { children: React.ReactNode }) {
