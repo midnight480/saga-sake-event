@@ -321,7 +321,8 @@ function ResetEvent() {
       >
         <strong className="text-terracotta-soft">消えるもの</strong>
         <br />
-        注文 {requests} 件 / 銘柄 {items} 件 / 券 {tickets} 枚 / 参加者の残高 / 問い合わせ
+        注文 {requests} 件 / 銘柄 {items} 件 / 券 {tickets} 枚 / 参加者の残高 / 問い合わせ /
+        お知らせの履歴（🔔）
         <br />
         <br />
         <strong className="text-matcha">残るもの</strong>
@@ -536,7 +537,7 @@ function Rehearsal() {
         onCancel={() => setConfirming(false)}
         pending={pending}
       >
-        実在する佐賀の酒蔵 3 蔵と、その銘柄 9 件、参加者 3 名、注文 9 件を作ります。
+        実在する佐賀の酒蔵 3 蔵と、その銘柄 9 件、参加者 6 名、注文 9 件を作ります。
         蔵のログインアカウントも本番と同じ手順で作られます。
         {already && (
           <>

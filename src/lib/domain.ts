@@ -158,6 +158,30 @@ export function canTransition(from: RequestStatus, to: RequestStatus): boolean {
 /** 対応待ち = 蔵がまだ渡し終えていないもの。 */
 export const OPEN_STATUSES: RequestStatus[] = ['accepted', 'preparing'];
 
+/**
+ * 参加者がまだ受け取っていない注文。
+ *
+ * OPEN_STATUSES と違って「準備完了 受取可」も含む。蔵から見れば手は離れて
+ * いるが、参加者の手元にはまだ届いていないので。
+ *
+ * これが 1 件でもある参加者は、次の注文を出せない（Issue #34）。受け取りに
+ * 来ないまま次々と頼まれると、蔵の前に杯が並んで取り違えが起きるため。
+ * place_order（schema-sql.ts）も同じ 3 つを見ている。ずらさないこと。
+ */
+export const UNDELIVERED_STATUSES: RequestStatus[] = ['accepted', 'preparing', 'ready'];
+
+/** その参加者のまだ受け取っていない注文。無ければ null。 */
+export function undeliveredRequestOf(
+  requests: OrderRequest[],
+  guestClerkId: string,
+): OrderRequest | null {
+  return (
+    requests.find(
+      (r) => r.guestClerkId === guestClerkId && UNDELIVERED_STATUSES.includes(r.status),
+    ) ?? null
+  );
+}
+
 // ─────────────────────────────────────────────────────────────
 // 銘柄の設定候補（持ち込み登録で「種類」を選ぶと自動で入る値）
 // ─────────────────────────────────────────────────────────────
@@ -196,7 +220,10 @@ export const BOOTHS = [
   'C-01', 'C-02', 'C-03', 'C-04', 'C-05', 'C-06',
 ] as const;
 
-/** 一度に頼める杯数の上限。 */
+/**
+ * 一度に頼める杯数の上限（Issue #34）。
+ * 受け取るまで次を頼めないので、手元に同時に来るのも最大でこの杯数になる。
+ */
 export const MAX_CUPS_PER_REQUEST = 3;
 
 /**
@@ -498,4 +525,112 @@ export function staleAlerts(
   return requests
     .filter((r) => r.status === 'accepted' && minutesSince(r.createdAt, now) >= STALE_REQUEST_MINUTES)
     .map((r) => `${nameOf(r.breweryId)} が ${minutesSince(r.createdAt, now)}分 未応答（${r.brand}）`);
+}
+
+// ─────────────────────────────────────────────────────────────
+// 参加者の記録（Issue #30, #32）
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * 注文の時刻を「9/21 14:32」の形にする。
+ *
+ * 端末の時計の設定に頼らず、必ず日本時間で出す。海外設定のスマホで開いても、
+ * 会場の時計と同じ時刻が並ぶように。
+ */
+export function formatJstDateTime(iso: string): string {
+  const date = new Date(iso);
+  if (!Number.isFinite(date.getTime())) return '―';
+  const parts = new Intl.DateTimeFormat('ja-JP', {
+    timeZone: 'Asia/Tokyo',
+    month: 'numeric',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).formatToParts(date);
+  const get = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((p) => p.type === type)?.value ?? '';
+  return `${get('month')}/${get('day')} ${get('hour')}:${get('minute')}`;
+}
+
+/** その参加者の注文を新しい順に。 */
+export function requestsOf(requests: OrderRequest[], guestClerkId: string): OrderRequest[] {
+  return requests
+    .filter((r) => r.guestClerkId === guestClerkId)
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+}
+
+export interface ItemConquest {
+  item: Item;
+  /** 受け取った杯数。0 なら未制覇。 */
+  cups: number;
+}
+
+export interface BreweryConquest {
+  brewery: Brewery;
+  items: ItemConquest[];
+  /** 1 杯でも受け取った銘柄の数。 */
+  conquered: number;
+}
+
+export interface Conquest {
+  breweries: BreweryConquest[];
+  /** 1 杯でも受け取った蔵の数。 */
+  breweriesVisited: number;
+  itemsConquered: number;
+  itemsTotal: number;
+  /** 受け取った杯数の合計。 */
+  cups: number;
+}
+
+/**
+ * どの蔵・どの銘柄をどれだけ飲んだか。
+ *
+ * 数えるのは **受渡完了** だけ。頼んだだけ・準備中のものは、まだ手元に無いので
+ * 「制覇」に含めない。キャンセルも含めない。
+ * 分母は、いま登録されている銘柄。途中で消された銘柄は分母にも分子にも入らない。
+ */
+export function conquestOf(
+  breweries: Brewery[],
+  requests: OrderRequest[],
+  guestClerkId: string,
+): Conquest {
+  const cupsByItem = new Map<string, number>();
+  for (const r of requests) {
+    if (r.guestClerkId !== guestClerkId || r.status !== 'delivered') continue;
+    cupsByItem.set(r.itemId, (cupsByItem.get(r.itemId) ?? 0) + r.cups);
+  }
+
+  const list = breweries
+    .filter((b) => b.items.length > 0)
+    .map((brewery) => {
+      const items = brewery.items.map((item) => ({ item, cups: cupsByItem.get(item.id) ?? 0 }));
+      return { brewery, items, conquered: items.filter((i) => i.cups > 0).length };
+    });
+
+  return {
+    breweries: list,
+    breweriesVisited: list.filter((b) => b.conquered > 0).length,
+    itemsConquered: list.reduce((sum, b) => sum + b.conquered, 0),
+    itemsTotal: list.reduce((sum, b) => sum + b.items.length, 0),
+    cups: list.reduce((sum, b) => sum + b.items.reduce((s, i) => s + i.cups, 0), 0),
+  };
+}
+
+// ─────────────────────────────────────────────────────────────
+// お知らせの履歴（右上の 🔔）
+// ─────────────────────────────────────────────────────────────
+
+export type NoticeKind = 'milestone' | 'ready';
+
+/** 🔔 に並ぶ 1 件。 */
+export interface Notice {
+  id: number;
+  kind: NoticeKind;
+  title: string;
+  body: string;
+  /** 押したときに開く画面。 */
+  url: string;
+  createdAt: string; // ISO
+  read: boolean;
 }

@@ -22,6 +22,8 @@ import {
   type GuestKind,
   type Guest,
   type Item,
+  type Notice,
+  type NoticeKind,
   type OrderRequest,
   type RequestStatus,
   type Inquiry,
@@ -808,6 +810,8 @@ export async function resetEvent(): Promise<Result<ResetCounts>> {
     txn.query('DELETE FROM inquiries RETURNING id'),
     // 節目のお知らせは、次のイベントで改めて送れるようにする。
     txn.query('DELETE FROM sent_notices'),
+    // 🔔 の履歴も前回の分は要らない。読んだ記録は外部キーで一緒に消える。
+    txn.query('DELETE FROM notices'),
     // 参加者番号を振り直す。次のイベントで #10001 から始まるようにする。
     txn.query('ALTER SEQUENCE guest_no_seq RESTART WITH 10001'),
     // 受付は「予定どおり」に戻す。手で開けたままにして忘れると危ない。
@@ -1033,24 +1037,118 @@ export interface Snapshot {
   guest: Guest | null;
   /** まだ返事をしていない問い合わせの件数。 */
   openInquiries: number;
+  /** 見ている本人の、まだ読んでいないお知らせの件数（右上の 🔔）。 */
+  unreadNotices: number;
   serverTime: string;
 }
 
-export async function getSnapshot(clerkUserId?: string): Promise<Snapshot> {
-  const [event, breweries, requests, batches, openInquiries] = await Promise.all([
+/**
+ * @param guestUserId 参加者として見ているときだけ渡す。残高を混ぜて返す。
+ * @param viewerUserId ログインしている人なら役割を問わず渡す。🔔 の未読数に使う。
+ */
+export async function getSnapshot(guestUserId?: string, viewerUserId?: string): Promise<Snapshot> {
+  const [event, breweries, requests, batches, openInquiries, unreadNotices] = await Promise.all([
     getEvent(),
     listBreweries(),
     listRequests(),
     listTicketBatches(),
     countOpenInquiries(),
+    viewerUserId ? countUnreadNotices(viewerUserId) : Promise.resolve(0),
   ]);
   return {
     event,
     breweries,
     requests,
     batches,
-    guest: clerkUserId ? await getOrCreateGuest(clerkUserId) : null,
+    guest: guestUserId ? await getOrCreateGuest(guestUserId) : null,
     openInquiries,
+    unreadNotices,
     serverTime: new Date().toISOString(),
   };
+}
+
+// ─────────────────────────────────────────────────────────────
+// お知らせの履歴（右上の 🔔）
+//
+// 見えるのは「自分あて」と「全員あて（clerk_user_id が NULL）」。
+// 読んだかどうかは notice_reads に人ごとに 1 行。全員あての 1 件でも、
+// 読んだ人と読んでいない人がいるので、お知らせ側には持たせない。
+// ─────────────────────────────────────────────────────────────
+
+/** まだ読んでいない件数。画面が数秒ごとに取りに来るので、1 本の SQL で数える。 */
+export async function countUnreadNotices(clerkUserId: string): Promise<number> {
+  const sql = await db();
+  const rows = (await sql`
+    SELECT count(*)::int AS n
+    FROM notices n
+    WHERE (n.clerk_user_id = ${clerkUserId} OR n.clerk_user_id IS NULL)
+      AND NOT EXISTS (
+        SELECT 1 FROM notice_reads r
+        WHERE r.notice_id = n.id AND r.clerk_user_id = ${clerkUserId}
+      )
+  `) as { n: number }[];
+  return Number(rows[0]?.n ?? 0);
+}
+
+/** 新しい順に。多すぎると 🔔 の中が読めなくなるので、直近の分だけ。 */
+export async function listNotices(clerkUserId: string, limit = 50): Promise<Notice[]> {
+  const sql = await db();
+  const rows = (await sql`
+    SELECT n.id, n.kind, n.title, n.body, n.url, n.created_at,
+           (r.notice_id IS NOT NULL) AS read
+    FROM notices n
+    LEFT JOIN notice_reads r ON r.notice_id = n.id AND r.clerk_user_id = ${clerkUserId}
+    WHERE n.clerk_user_id = ${clerkUserId} OR n.clerk_user_id IS NULL
+    ORDER BY n.created_at DESC, n.id DESC
+    LIMIT ${limit}
+  `) as {
+    id: number | string;
+    kind: NoticeKind;
+    title: string;
+    body: string;
+    url: string;
+    created_at: string | Date;
+    read: boolean;
+  }[];
+  return rows.map((r) => ({
+    id: Number(r.id),
+    kind: r.kind,
+    title: r.title,
+    body: r.body,
+    url: r.url,
+    createdAt: new Date(r.created_at).toISOString(),
+    read: Boolean(r.read),
+  }));
+}
+
+/**
+ * 1 件を読んだことにする。
+ *
+ * 見えるお知らせ（自分あて・全員あて）のときだけ記録を作る。ほかの人あての
+ * id を渡されても何も起きない。何度呼んでも 1 行のまま（ON CONFLICT）。
+ */
+export async function markNoticeRead(clerkUserId: string, noticeId: number): Promise<void> {
+  const sql = await db();
+  await sql`
+    INSERT INTO notice_reads (notice_id, clerk_user_id)
+    SELECT n.id, ${clerkUserId}
+    FROM notices n
+    WHERE n.id = ${noticeId}
+      AND (n.clerk_user_id = ${clerkUserId} OR n.clerk_user_id IS NULL)
+    ON CONFLICT (notice_id, clerk_user_id) DO NOTHING
+  `;
+}
+
+/** 見えているものを全部、読んだことにする。新しく既読にした件数を返す。 */
+export async function markAllNoticesRead(clerkUserId: string): Promise<number> {
+  const sql = await db();
+  const rows = (await sql`
+    INSERT INTO notice_reads (notice_id, clerk_user_id)
+    SELECT n.id, ${clerkUserId}
+    FROM notices n
+    WHERE n.clerk_user_id = ${clerkUserId} OR n.clerk_user_id IS NULL
+    ON CONFLICT (notice_id, clerk_user_id) DO NOTHING
+    RETURNING notice_id
+  `) as unknown[];
+  return rows.length;
 }

@@ -20,7 +20,18 @@ import { clerkKeys, hasClerk } from '@/lib/auth';
 // 主催者に設定してもらう項目が 1 つ増えてしまう。秘密鍵は env-init が
 // process.env に書き戻したものを Clerk 自身に読ませる。
 export default hasClerk()
-  ? clerkMiddleware(async () => {}, { publishableKey: clerkKeys().publishableKey })
+  ? clerkMiddleware(
+      async (_auth, req) => {
+        // レイアウトからは「いま開こうとしている URL」が見えない。
+        // 参加者が券の QR（/guest/charge?code=…）をログイン前に読んだとき、
+        // ログイン後にそこへ戻さないとコードが失われ、もう一度読むことになる。
+        // それを避けるため、パスとクエリをヘッダで渡しておく（guest/layout.tsx）。
+        const headers = new Headers(req.headers);
+        headers.set('x-request-path', req.nextUrl.pathname + req.nextUrl.search);
+        return NextResponse.next({ request: { headers } });
+      },
+      { publishableKey: clerkKeys().publishableKey },
+    )
   : () => NextResponse.next();
 
 export const config = {

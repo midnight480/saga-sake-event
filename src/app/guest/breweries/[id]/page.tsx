@@ -16,8 +16,10 @@ import {
 } from '@/components/ui';
 import {
   MAX_CUPS_PER_REQUEST,
+  STATUS_LABEL,
   itemAvailableCups,
   orderingStatus,
+  undeliveredRequestOf,
   waitingCount,
   type Item,
 } from '@/lib/domain';
@@ -45,6 +47,14 @@ export default function GuestBreweryDetailPage() {
   // 受付が閉じている理由まで見て、参加者に伝える言葉を変える。
   const status = orderingStatus(snapshot.event, new Date(snapshot.serverTime));
   const guest = snapshot.guest;
+
+  // 受け取っていない注文があるうちは、次を頼めない（Issue #34）。
+  // サーバー側（place_order）でも止めるが、押してから断られるより、
+  // 先に理由と行き先を見せたほうが迷わない。
+  const undelivered = guest ? undeliveredRequestOf(snapshot.requests, guest.clerkUserId) : null;
+  const undeliveredAt = undelivered
+    ? snapshot.breweries.find((b) => b.id === undelivered.breweryId)?.name
+    : undefined;
 
   return (
     <>
@@ -89,6 +99,20 @@ export default function GuestBreweryDetailPage() {
         </div>
       )}
 
+      {undelivered && (
+        <div className="px-5 pt-4">
+          <Notice tone="info" title="まだ受け取っていないリクエストがあります">
+            {undeliveredAt ? `${undeliveredAt}の` : ''}
+            <strong className="font-bold text-ink">{undelivered.brand}</strong>（
+            {STATUS_LABEL[undelivered.status]}）を受け取ると、次のリクエストを出せます。
+            <br />
+            <Link href="/guest" className="underline">
+              マイページで様子を見る
+            </Link>
+          </Notice>
+        </div>
+      )}
+
       <div className="flex flex-col gap-3 px-5 py-4">
         {brewery.items.length === 0 ? (
           <Empty>この蔵はまだ銘柄を登録していません。</Empty>
@@ -98,8 +122,10 @@ export default function GuestBreweryDetailPage() {
               key={item.id}
               item={item}
               tickets={guest?.tickets ?? 0}
-              blocked={!status.open || !brewery.accepting}
-              blockedReason={!status.open ? status.label : '受付停止中'}
+              blocked={!status.open || !brewery.accepting || !!undelivered}
+              blockedReason={
+                !status.open ? status.label : !brewery.accepting ? '受付停止中' : '受け取り待ちです'
+              }
             />
           ))
         )}
@@ -189,6 +215,9 @@ function OrderCard({
           decreaseDisabled={cups <= 1}
           increaseDisabled={cups >= Math.min(MAX_CUPS_PER_REQUEST, left || 1)}
         />
+        <p className="-mt-1 text-center text-[11px] leading-none text-ink-45">
+          一度に頼めるのは {MAX_CUPS_PER_REQUEST} 杯までです
+        </p>
         <Button
           tone="go"
           block

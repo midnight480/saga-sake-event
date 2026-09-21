@@ -59,11 +59,20 @@ export const REHEARSAL_BREWERIES: RehearsalBrewery[] = [
   },
 ];
 
-/** 予行演習で作る参加者。Clerk のアカウントは作らない（画面の確認用）。 */
+/**
+ * 予行演習で作る参加者。Clerk のアカウントは作らない（画面の確認用）。
+ *
+ * 6 人いるのは、1 人が持てる「まだ受け取っていない注文」が 1 件だけだから
+ * （Issue #34）。受付済・準備中・準備完了の注文を各蔵に散らすには、
+ * それぞれ別の人が頼んでいる必要がある。
+ */
 export const REHEARSAL_GUESTS = [
   { id: 'rehearsal-guest-1', label: '予行 参加者 A', points: 40 },
   { id: 'rehearsal-guest-2', label: '予行 参加者 B', points: 25 },
   { id: 'rehearsal-guest-3', label: '予行 参加者 C', points: 12 },
+  { id: 'rehearsal-guest-4', label: '予行 参加者 D', points: 30 },
+  { id: 'rehearsal-guest-5', label: '予行 参加者 E', points: 20 },
+  { id: 'rehearsal-guest-6', label: '予行 参加者 F', points: 15 },
 ] as const;
 
 /**
@@ -72,6 +81,9 @@ export const REHEARSAL_GUESTS = [
  * 状態を散らしてある。全部「受付済」だと、蔵の画面でボタンの並びが
  * 1 通りしか見られないし、ダッシュボードの「受渡完了」も 0 のままになる。
  * 1 件だけ、わざと古い時刻にして応答遅延の警告を出す。
+ *
+ * 1 人の未受取（受付済・準備中・準備完了）は 1 件まで。本番では place_order が
+ * それ以上を断るので、予行演習でも同じ形にしておく。受渡完了は何件でもよい。
  */
 export const REHEARSAL_ORDERS: {
   brewery: number;
@@ -84,14 +96,14 @@ export const REHEARSAL_ORDERS: {
 }[] = [
   { brewery: 0, item: 0, guest: 0, cups: 1, status: 'delivered', minutesAgo: 48 },
   { brewery: 0, item: 1, guest: 1, cups: 2, status: 'ready', minutesAgo: 9 },
-  { brewery: 0, item: 2, guest: 0, cups: 1, status: 'accepted', minutesAgo: 3 },
+  { brewery: 0, item: 2, guest: 2, cups: 1, status: 'accepted', minutesAgo: 3 },
 
   { brewery: 1, item: 0, guest: 1, cups: 1, status: 'delivered', minutesAgo: 35 },
-  { brewery: 1, item: 1, guest: 2, cups: 1, status: 'preparing', minutesAgo: 6 },
+  { brewery: 1, item: 1, guest: 3, cups: 1, status: 'preparing', minutesAgo: 6 },
   // わざと古いままにして、主催者に応答遅延の警告を出す。
-  { brewery: 1, item: 2, guest: 0, cups: 1, status: 'accepted', minutesAgo: 17 },
+  { brewery: 1, item: 2, guest: 4, cups: 1, status: 'accepted', minutesAgo: 17 },
 
   { brewery: 2, item: 0, guest: 2, cups: 1, status: 'delivered', minutesAgo: 41 },
-  { brewery: 2, item: 1, guest: 1, cups: 1, status: 'ready', minutesAgo: 12 },
+  { brewery: 2, item: 1, guest: 5, cups: 1, status: 'ready', minutesAgo: 12 },
   { brewery: 2, item: 2, guest: 0, cups: 2, status: 'preparing', minutesAgo: 4 },
 ];

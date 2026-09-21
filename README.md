@@ -131,14 +131,14 @@ Vercel は **`main` ブランチ**を見ています。`main` に変更が入る
 
 ```
 開場前   酒蔵が、持ち込んだ銘柄・1杯あたりのポイント・本数を登録
-         主催者が、券を刷って受付に置き、貼る QR を掲示
+         主催者が、券（1 枚ごとに QR 付き）を刷って受付に置く
 
 開始     時刻になると自動で受付が開く（手動で早めることもできます）
 
-開催中   参加者は受付で券を受け取り、貼ってある QR で画面を開いて
-         券のコードを入れる → ポイントが入る
-         酒蔵をさがして、銘柄を選んでリクエスト
+開催中   参加者は受付で券を受け取り、券の QR をカメラで読む → ポイントが入る
+         酒蔵をさがして、銘柄を選んでリクエスト（一度に 3 杯まで）
          酒蔵は 準備中 → 準備完了 → 受渡完了 と進める
+         参加者は受け取ってから、次のリクエストを出せる
          主催者はダッシュボードで在庫・混雑・遅延を見る
 
 終了     時刻になると自動で受付が閉じる
@@ -190,7 +190,6 @@ flowchart TB
   subgraph app["Vercel ─ Next.js App Router"]
     act["app/actions.ts<br/>Server Actions ─ 権限確認はここに集約"]
     snap["GET /api/snapshot<br/>会場のいまを 1 回で返す"]
-    qr["GET /api/qr<br/>受付に貼る QR"]
     auth["lib/auth.ts ─ 役割の判定"]
     store["lib/store.ts ─ DB の読み書き"]
     push["lib/push.ts ─ 節目のお知らせ"]
@@ -205,7 +204,6 @@ flowchart TB
   ui -->|"4 秒ごとに読みに行く"| mw
   mw --> act
   mw --> snap
-  mw --> qr
   mw -->|"セッションの確認"| clerk
 
   act --> auth
@@ -250,8 +248,8 @@ sequenceDiagram
 
   rect rgb(245, 245, 235)
   Note over G,D: 受付 ─ ポイントを受け取る
-  G->>P: 貼ってある QR を読む（/guest/charge が開く）
-  G->>P: 紙の券のコードを入れる
+  G->>P: 券の QR をカメラで読む（/guest/charge?code=… が開く）
+  Note over P: ログイン前なら、ログイン後に<br/>同じ URL へ戻ってくる
   P->>A: redeemTicket(code)
   A->>D: 券の消し込みとポイント加算を 1 本の SQL で
   Note right of D: 条件を WHERE に入れているので、<br/>同じ券を同時に読んでも加算は 1 回だけ

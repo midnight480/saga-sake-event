@@ -211,6 +211,20 @@ export const STATEMENTS: string[] = [
        RETURN;
      END IF;
 
+     -- まだ受け取っていない注文があれば、次は出させない（Issue #34）。
+     -- 参加者の行をロックしたあとで確かめるのが要。2 台の端末から同時に
+     -- 押されても、2 本目はロックが空くのを待ち、そのあとの文で 1 本目の
+     -- 注文が見えるので、ここで止まる。domain.ts の UNDELIVERED_STATUSES と同じ。
+     IF EXISTS (
+       SELECT 1 FROM requests
+        WHERE guest_clerk_id = p_user AND status IN ('accepted', 'preparing', 'ready')
+     ) THEN
+       RETURN QUERY SELECT false,
+         'まだ受け取っていないリクエストがあります。受け取ってから次をお選びください。'::text,
+         NULL::bigint, NULL::integer;
+       RETURN;
+     END IF;
+
      IF v_tickets < v_spend THEN
        RETURN QUERY SELECT false,
          format('ポイントが %s 足りません。', v_spend - v_tickets)::text,
@@ -273,6 +287,29 @@ export const STATEMENTS: string[] = [
      milestone  text NOT NULL,
      sent_at    timestamptz NOT NULL DEFAULT now(),
      PRIMARY KEY (event_date, milestone)
+   )`,
+
+  // ── お知らせの履歴。右上の 🔔 から見返せるようにする。
+  //    OS の通知は一度消すと見返せず、iPhone はホーム画面に追加しないと届きも
+  //    しない。届いたかどうかに関係なく、アプリの中に残しておく。
+  //    clerk_user_id が NULL のものは全員あて（開始 10 分前などの節目）。──
+  `CREATE TABLE IF NOT EXISTS notices (
+     id            bigserial PRIMARY KEY,
+     clerk_user_id text,
+     kind          text        NOT NULL,
+     title         text        NOT NULL,
+     body          text        NOT NULL,
+     url           text        NOT NULL DEFAULT '/',
+     created_at    timestamptz NOT NULL DEFAULT now(),
+     CONSTRAINT notices_kind_valid CHECK (kind IN ('milestone', 'ready'))
+   )`,
+  `CREATE INDEX IF NOT EXISTS notices_user_idx ON notices (clerk_user_id, created_at DESC)`,
+  // 読んだ記録。1 人 1 件に 1 行。全員あてのお知らせも、読んだかどうかは人ごとに違う。
+  `CREATE TABLE IF NOT EXISTS notice_reads (
+     notice_id     bigint      NOT NULL REFERENCES notices (id) ON DELETE CASCADE,
+     clerk_user_id text        NOT NULL,
+     read_at       timestamptz NOT NULL DEFAULT now(),
+     PRIMARY KEY (notice_id, clerk_user_id)
    )`,
 
   // ── 内部メモ（スキーマ版数など）──

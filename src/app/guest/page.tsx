@@ -10,7 +10,8 @@ import {
   StatusBadge,
   Title,
 } from '@/components/ui';
-import { STATUS_MESSAGE } from '@/lib/domain';
+import { ReadyNoticePrompt } from '@/components/ReadyNoticePrompt';
+import { STATUS_MESSAGE, undeliveredRequestOf } from '@/lib/domain';
 import { useSnapshot } from '@/lib/useSnapshot';
 
 /** マイページ。チケット残高と、自分の注文の様子。 */
@@ -53,6 +54,9 @@ export default function GuestHome() {
           会場でポイントを追加する
         </Link>
       </header>
+
+      {/* 受け取りを待っているときだけ、通知の案内を出す（Issue #35）。 */}
+      {undeliveredRequestOf(snapshot.requests, guest.clerkUserId) && <ReadyNoticePrompt />}
 
       <SectionLabel>わたしのリクエスト</SectionLabel>
       <div className="flex flex-col gap-3 px-5 pb-6">

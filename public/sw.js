@@ -15,7 +15,7 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('push', (event) => {
-  let data = { title: '佐賀 蔵めぐり', body: '', url: '/' };
+  let data = { title: '佐賀 蔵めぐり', body: '', url: '/', tag: '' };
   try {
     if (event.data) data = { ...data, ...event.data.json() };
   } catch {
@@ -27,8 +27,9 @@ self.addEventListener('push', (event) => {
       body: data.body,
       icon: '/icon.svg',
       badge: '/icon.svg',
-      // 同じ節目の通知が重ならないようにする。
-      tag: data.url + data.title,
+      // 同じ知らせが重ならないようにする。送る側が tag を決めていればそれを使う
+      // （準備完了の通知は注文ごとに別の tag。別の注文の知らせを上書きしない）。
+      tag: data.tag || data.url + data.title,
       data: { url: data.url },
     }),
   );
@@ -40,9 +41,14 @@ self.addEventListener('notificationclick', (event) => {
 
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((list) => {
-      // すでに開いているタブがあれば、そちらを前に出す。
+      // すでに開いているタブがあれば、そちらを前に出して、知らせの画面へ移す。
+      // 前に出すだけだと、別の画面を開いていた人は何のことか分からない。
       for (const client of list) {
-        if ('focus' in client) return client.focus();
+        if ('focus' in client) {
+          return client.focus().then((focused) =>
+            focused && 'navigate' in focused ? focused.navigate(url) : focused,
+          );
+        }
       }
       return self.clients.openWindow(url);
     }),

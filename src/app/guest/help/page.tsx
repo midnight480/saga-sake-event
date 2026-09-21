@@ -11,15 +11,15 @@ export default function GuestHelpPage() {
         <Title>使い方</Title>
       </ScreenHeader>
 
-      <PushSettings />
+      <PushSettings extraReasons={['注文したお酒ができあがったとき']} />
 
       <HelpSection title="はじめ方">
         <HelpSteps
           items={[
             <>会場の受付で券をお受け取りください。</>,
             <>
-              下の<strong className="text-ink">「チケット」</strong>を開き、券に書かれた
-              コードを入れます。
+              券の <strong className="text-ink">QR をスマートフォンのカメラで読み取ります</strong>。
+              カメラが使えないときは、上のメニューの「チケット」を開いて、QR の下のコードを入れます。
             </>,
             <>
               <strong className="text-ink">ポイント</strong>が入ります。このポイントで
@@ -42,13 +42,20 @@ export default function GuestHelpPage() {
             <>
               行きたい蔵をえらびます。銘柄ごとに、必要なポイントと残りの杯数が出ています。
             </>,
-            <>ブースの前で、銘柄と杯数をえらんで「リクエスト」を押します。</>,
+            <>
+              ブースの前で、銘柄と杯数をえらんで「リクエスト」を押します。
+              一度に頼めるのは <strong className="text-ink">3 杯まで</strong>です。
+            </>,
             <>
               <strong className="text-ink">マイページ</strong>に移ります。ここで進み具合が
               分かります。
             </>,
             <>
               「ブースで受け取ってください」と出たら、その蔵まで取りに行ってください。
+            </>,
+            <>
+              <strong className="text-ink">受け取ってから、次のリクエストを出せます。</strong>
+              受け取る前は、ほかの蔵のお酒も頼めません。
             </>,
           ]}
         />
@@ -73,6 +80,15 @@ export default function GuestHelpPage() {
               when: '銘柄に取り消し線',
               then: <>その銘柄は完売です。ほかの銘柄をおえらびください。</>,
             },
+            {
+              when: '「受け取り待ちです」と出て押せない',
+              then: (
+                <>
+                  まだ受け取っていないリクエストがあります。マイページで様子を見て、
+                  受け取ってから次をどうぞ。
+                </>
+              ),
+            },
           ]}
         />
       </HelpSection>
@@ -89,6 +105,13 @@ export default function GuestHelpPage() {
         />
       </HelpSection>
 
+      <HelpSection title="記録を見る">
+        <HelpText>
+          上のメニューの<strong className="text-ink">「記録」</strong>で、どの蔵のどの銘柄を何杯いただいたかと、
+          これまでの注文を時刻つきで見られます。数えるのは受け取ったお酒だけです。
+        </HelpText>
+      </HelpSection>
+
       <HelpSection title="困ったとき">
         <HelpTroubles
           rows={[
@@ -96,7 +119,7 @@ export default function GuestHelpPage() {
               when: 'ポイントが足りない',
               then: (
                 <>
-                  受付で券を追加でお求めください。下の「チケット」から、新しい券のコードを
+                  受付で券を追加でお求めください。上のメニューの「チケット」から、新しい券のコードを
                   入れるとポイントが増えます。
                 </>
               ),
