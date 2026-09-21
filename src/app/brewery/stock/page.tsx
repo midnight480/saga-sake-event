@@ -2,11 +2,18 @@
 
 import { useState, useTransition } from 'react';
 
-import { addBrand, changeBottles, removeBrand, setTicketCost } from '@/app/actions';
+import {
+  addBrand,
+  changeBottles,
+  removeBrand,
+  setBrandProfile,
+  setTicketCost,
+} from '@/app/actions';
 import {
   AddBox,
   Button,
   Card,
+  Chip,
   Empty,
   Eyebrow,
   Note,
@@ -19,13 +26,19 @@ import {
 } from '@/components/ui';
 import {
   CUPS_PER_BOTTLE,
+  MAX_ITEM_DESCRIPTION,
   MAX_TICKET_COST,
+  countChars,
   SAKE_KINDS,
+  SAKE_RICHNESS,
+  SAKE_SWEETNESS,
+  tasteTags,
   itemCupsLeft,
   itemTotalCups,
   type BottleSize,
   type Item,
 } from '@/lib/domain';
+import { TasteTags } from '@/components/TasteTags';
 import { useSnapshot } from '@/lib/useSnapshot';
 
 import { useBreweryContext } from '../shell';
@@ -45,6 +58,9 @@ export default function BreweryStockPage() {
   const [polish, setPolish] = useState(SAKE_KINDS[3].polish);
   const [size, setSize] = useState<BottleSize>('四合瓶');
   const [ticketCost, setTicketCost] = useState(SAKE_KINDS[3].ticketCost);
+  const [description, setDescription] = useState('');
+  const [richness, setRichness] = useState('');
+  const [sweetness, setSweetness] = useState('');
 
   if (isInitialLoading || !snapshot) return <Empty>読み込んでいます…</Empty>;
 
@@ -65,9 +81,25 @@ export default function BreweryStockPage() {
     if (!name.trim()) return;
     setError(null);
     startTransition(async () => {
-      const result = await addBrand({ breweryId, name: name.trim(), kind, polish, size, ticketCost });
-      if (result.ok) setName('');
-      else setError(result.reason);
+      const result = await addBrand({
+        breweryId,
+        name: name.trim(),
+        kind,
+        polish,
+        size,
+        ticketCost,
+        description,
+        richness,
+        sweetness,
+      });
+      if (result.ok) {
+        setName('');
+        setDescription('');
+        setRichness('');
+        setSweetness('');
+      } else {
+        setError(result.reason);
+      }
       await refresh();
     });
   };
@@ -97,6 +129,15 @@ export default function BreweryStockPage() {
             placeholder="銘柄名（例：七田 純米）"
             className={inputClass}
           />
+
+          <TasteField
+            richness={richness}
+            sweetness={sweetness}
+            onRichness={setRichness}
+            onSweetness={setSweetness}
+          />
+
+          <DescriptionField value={description} onChange={setDescription} />
 
           <span className="text-[11.5px] leading-none text-ink-55">種類をえらぶ</span>
           <div role="radiogroup" aria-label="種類" className="grid grid-cols-2 gap-2">
@@ -168,7 +209,12 @@ export default function BreweryStockPage() {
             つまみを動かして合わせてください。
           </Note>
 
-          <Button tone="go" block onClick={submit} disabled={pending || !name.trim()}>
+          <Button
+            tone="go"
+            block
+            onClick={submit}
+            disabled={pending || !name.trim() || countChars(description) > MAX_ITEM_DESCRIPTION}
+          >
             {pending ? '登録しています…' : 'この銘柄を登録する'}
           </Button>
         </AddBox>
@@ -246,6 +292,8 @@ function ItemCard({ item }: { item: Item }) {
         </div>
       </div>
 
+      <ItemProfile item={item} />
+
       {error && <Notice tone="danger">{error}</Notice>}
 
       <Stepper
@@ -285,5 +333,175 @@ function ItemCard({ item }: { item: Item }) {
         </span>
       </div>
     </Card>
+  );
+}
+
+/**
+ * 銘柄の説明（任意、Issue #40）。
+ *
+ * 初めての人には、銘柄名だけではどんなお酒か分からない。味わいや飲み方を
+ * 蔵の言葉で添えてもらい、参加者が銘柄を選ぶ画面に出す。
+ */
+function DescriptionField({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  const count = countChars(value);
+  return (
+    <label className="flex flex-col gap-2">
+      <span className="flex items-baseline justify-between text-[11.5px] leading-none text-ink-55">
+        <span>説明（任意）</span>
+        <span className={count > MAX_ITEM_DESCRIPTION ? 'text-terracotta-soft' : ''}>
+          {count} / {MAX_ITEM_DESCRIPTION}
+        </span>
+      </span>
+      <textarea
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        rows={3}
+        placeholder="例：すっきりとした辛口。冷やしてどうぞ。"
+        className={`${inputClass} resize-y leading-[1.8]`}
+      />
+    </label>
+  );
+}
+
+/**
+ * 味わいの型（任意）。濃淡と甘辛を 1 つずつ選ぶ。
+ *
+ * 説明文を読まなくても、初めての人が「淡麗・辛口」のように一目で分かるように。
+ * どちらも「えらばない」が初期値。選んだものだけが参加者の画面に出る。
+ */
+function TasteField({
+  richness,
+  sweetness,
+  onRichness,
+  onSweetness,
+}: {
+  richness: string;
+  sweetness: string;
+  onRichness: (value: string) => void;
+  onSweetness: (value: string) => void;
+}) {
+  return (
+    <div className="flex flex-col gap-2.5">
+      <ChoiceRow label="濃淡（任意）" choices={SAKE_RICHNESS} value={richness} onChange={onRichness} />
+      <ChoiceRow label="甘辛（任意）" choices={SAKE_SWEETNESS} value={sweetness} onChange={onSweetness} />
+    </div>
+  );
+}
+
+function ChoiceRow({
+  label,
+  choices,
+  value,
+  onChange,
+}: {
+  label: string;
+  choices: readonly string[];
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <div className="flex flex-col gap-2">
+      <span className="text-[11.5px] leading-none text-ink-55">{label}</span>
+      <div role="radiogroup" aria-label={label} className="flex flex-wrap gap-2">
+        <Chip active={value === ''} onClick={() => onChange('')}>
+          えらばない
+        </Chip>
+        {choices.map((choice) => (
+          <Chip key={choice} active={value === choice} onClick={() => onChange(choice)}>
+            {choice}
+          </Chip>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * 登録済みの銘柄の説明と味わいの型。書き直しもここで。
+ * 誤字のために銘柄を作り直させない（本数や受けた注文が消えてしまう）。
+ */
+function ItemProfile({ item }: { item: Item }) {
+  const { refresh } = useSnapshot();
+  const [editing, setEditing] = useState(false);
+  const [description, setDescription] = useState(item.description);
+  const [richness, setRichness] = useState<string>(item.richness);
+  const [sweetness, setSweetness] = useState<string>(item.sweetness);
+  const [pending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+
+  const startEditing = () => {
+    setDescription(item.description);
+    setRichness(item.richness);
+    setSweetness(item.sweetness);
+    setError(null);
+    setEditing(true);
+  };
+
+  const save = () => {
+    setError(null);
+    startTransition(async () => {
+      const result = await setBrandProfile(item.id, { description, richness, sweetness });
+      if (!result.ok) {
+        setError(result.reason);
+        return;
+      }
+      await refresh();
+      setEditing(false);
+    });
+  };
+
+  const empty = !item.description && tasteTags(item).length === 0;
+
+  if (!editing) {
+    return (
+      <div className="flex flex-col gap-2">
+        <TasteTags item={item} />
+        {item.description && (
+          <p className="text-[12.5px] leading-[1.8] whitespace-pre-line text-ink-70">
+            {item.description}
+          </p>
+        )}
+        {empty && (
+          <p className="text-[11.5px] leading-[1.7] text-ink-45">
+            味わいと説明はまだありません。初めての方の手がかりになります。
+          </p>
+        )}
+        <Button tone="flat" block onClick={startEditing}>
+          {empty ? '味わいと説明を書く' : '味わいと説明を直す'}
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-2.5">
+      <TasteField
+        richness={richness}
+        sweetness={sweetness}
+        onRichness={setRichness}
+        onSweetness={setSweetness}
+      />
+      <DescriptionField value={description} onChange={setDescription} />
+      {error && <Notice tone="danger">{error}</Notice>}
+      <div className="flex gap-2">
+        <Button tone="ghost" className="flex-1" onClick={() => setEditing(false)} disabled={pending}>
+          やめる
+        </Button>
+        <Button
+          tone="go"
+          className="flex-1"
+          onClick={save}
+          disabled={pending || countChars(description) > MAX_ITEM_DESCRIPTION}
+        >
+          {pending ? '保存しています…' : '保存する'}
+        </Button>
+      </div>
+    </div>
   );
 }

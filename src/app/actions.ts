@@ -257,6 +257,10 @@ export async function addBrand(input: {
   polish: number;
   size: BottleSize;
   ticketCost: number;
+  /** 任意の説明文と味わいの型（Issue #40）。 */
+  description?: string;
+  richness?: string;
+  sweetness?: string;
 }): Promise<ActionResult> {
   return run(async () => {
     const viewer = await requireBrewery(input.breweryId);
@@ -278,6 +282,19 @@ export async function changeBottles(itemId: string, delta: number): Promise<Acti
   return run(async () => {
     await requireItemOwner(itemId);
     const result = await store.changeBottles(itemId, delta);
+    refresh();
+    return result.ok ? { ok: true } : { ok: false, reason: result.reason };
+  });
+}
+
+/** 銘柄の説明と味わいの型を書き直す（Issue #40）。持ち主の蔵（と主催者）だけ。 */
+export async function setBrandProfile(
+  itemId: string,
+  input: { description: string; richness: string; sweetness: string },
+): Promise<ActionResult> {
+  return run(async () => {
+    await requireItemOwner(itemId);
+    const result = await store.setItemProfile(itemId, input);
     refresh();
     return result.ok ? { ok: true } : { ok: false, reason: result.reason };
   });

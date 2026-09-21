@@ -24,6 +24,11 @@ export default function BreweryHelpPage() {
               よく使う値が自動で入ります。
             </>,
             <>
+              よければ<strong className="text-ink">味わい（淡麗・濃醇、甘口〜辛口）</strong>をえらび、
+              <strong className="text-ink">説明</strong>を添えてください（どちらも任意）。
+              初めての方が、どんなお酒かを知る手がかりになります。登録したあとでも直せます。
+            </>,
+            <>
               <strong className="text-ink">1 杯 いただくのに何ポイント使うか</strong>を決めます。
               銘柄ごとに変えられます。
             </>,
