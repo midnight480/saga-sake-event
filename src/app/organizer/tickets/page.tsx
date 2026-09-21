@@ -152,7 +152,7 @@ function BatchCard({ batch }: { batch: TicketBatch }) {
           label="この券 1 枚で、チケット何枚分にするか"
           hint={
             canChangeCups
-              ? '来場者が何杯飲めるかの目安になります。1杯＝1〜3枚です。'
+              ? '1 杯あたり 1〜3 枚です。'
               : 'すでに発行した券があるため変更できません。変えるには、下の「発行した券を取り消す」で 0 枚に戻してください。'
           }
         >
@@ -201,9 +201,6 @@ function BatchCard({ batch }: { batch: TicketBatch }) {
           aria-label="発行する枚数"
           className={inputClass}
         />
-        <p className="text-[11px] leading-[1.6] text-ink-45">
-          {count} 枚 発行すると、来場者 {count} 人分・チケット {count * cups} 枚分になります。
-        </p>
         <Button
           tone="go"
           block

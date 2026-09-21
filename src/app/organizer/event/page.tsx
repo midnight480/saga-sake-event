@@ -243,10 +243,6 @@ function TicketPlan({ batch }: { batch: TicketBatch }) {
         </Button>
       </div>
 
-      <p className="text-[11px] leading-[1.7] text-ink-45">
-        1 枚で チケット {batch.cupsPerTicket} 枚分 ＝ 来場者 {target} 人分。
-        1 枚あたりの枚数は「チケットQR」の画面で変えられます。
-      </p>
     </Card>
   );
 }
