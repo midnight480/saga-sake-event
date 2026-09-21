@@ -21,7 +21,8 @@ export default async function BreweryLayout({ children }: { children: React.Reac
   if (!hasDatabase() || !hasClerk()) redirect('/setup');
 
   const viewer = await getViewer();
-  if (!viewer) redirect('/sign-in');
+  // 蔵は Clerk の標準画面ではなく、蔵ID とパスワードの画面へ送る。
+  if (!viewer) redirect('/brewery-login');
 
   if (viewer.role === 'guest') redirect('/guest');
 

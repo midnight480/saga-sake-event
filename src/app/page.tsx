@@ -52,12 +52,19 @@ export default async function Home() {
           >
             はじめて参加する（登録）
           </Link>
+          <Link
+            href="/brewery-login"
+            className="flex min-h-14 items-center justify-center rounded-field border border-hairline-strong text-[14px] font-bold tracking-[0.08em] text-ink-70 transition-colors hover:text-ink"
+          >
+            酒蔵の方はこちら
+          </Link>
         </div>
 
         <div className="mt-10 flex flex-col gap-2 border-t border-hairline pt-6 text-[11.5px] leading-[1.9] text-ink-45">
           <p>
             <span className="text-gold">酒蔵の方</span>
-            ：主催者からお渡しした蔵ID（kura-001 など）とパスワードでログインしてください。
+            ：「酒蔵の方はこちら」から、主催者にお渡しした蔵ID（kura-001 など）と
+            パスワードでログインしてください。
           </p>
           <p>
             <span className="text-gold">参加者の方</span>
