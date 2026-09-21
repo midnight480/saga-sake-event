@@ -24,6 +24,7 @@ import {
   type Item,
   type OrderRequest,
   type RequestStatus,
+  type Inquiry,
   type TicketBatch,
 } from './domain';
 
@@ -736,6 +737,111 @@ export async function setRequestStatus(
 }
 
 // ─────────────────────────────────────────────────────────────
+// 問い合わせ
+// ─────────────────────────────────────────────────────────────
+
+function toInquiry(row: Record<string, unknown>): Inquiry {
+  return {
+    id: Number(row.id),
+    fromRole: row.from_role as 'brewery' | 'guest',
+    fromLabel: String(row.from_label),
+    subject: String(row.subject ?? ''),
+    body: String(row.body),
+    answer: row.answer === null || row.answer === undefined ? null : String(row.answer),
+    answeredAt: row.answered_at ? new Date(row.answered_at as string).toISOString() : null,
+    createdAt: new Date(row.created_at as string).toISOString(),
+  };
+}
+
+export async function createInquiry(input: {
+  clerkUserId: string;
+  role: 'brewery' | 'guest';
+  label: string;
+  breweryId?: string;
+  subject: string;
+  body: string;
+}): Promise<Result<{ id: number }>> {
+  const { MAX_INQUIRY_BODY, MAX_INQUIRY_SUBJECT, countChars } = await import('./domain');
+
+  const subject = input.subject.trim();
+  const body = input.body.trim();
+
+  if (!body) return fail('お問い合わせの内容を入れてください。');
+  if (countChars(body) > MAX_INQUIRY_BODY) {
+    return fail(`内容は ${MAX_INQUIRY_BODY} 文字までです。`);
+  }
+  if (countChars(subject) > MAX_INQUIRY_SUBJECT) {
+    return fail(`件名は ${MAX_INQUIRY_SUBJECT} 文字までです。`);
+  }
+
+  const sql = await db();
+  const rows = (await sql`
+    INSERT INTO inquiries (from_clerk_id, from_role, from_label, brewery_id, subject, body)
+    VALUES (${input.clerkUserId}, ${input.role}, ${input.label},
+            ${input.breweryId ?? null}, ${subject}, ${body})
+    RETURNING id
+  `) as { id: number }[];
+
+  return ok({ id: Number(rows[0].id) });
+}
+
+/** 主催者が見る一覧。未回答を先に、新しい順。 */
+export async function listInquiries(limit = 200): Promise<Inquiry[]> {
+  const sql = await db();
+  const rows = (await sql`
+    SELECT id, from_role, from_label, subject, body, answer, answered_at, created_at
+    FROM inquiries
+    ORDER BY (answer IS NULL) DESC, created_at DESC
+    LIMIT ${limit}
+  `) as Record<string, unknown>[];
+  return rows.map(toInquiry);
+}
+
+/** 自分が出した問い合わせ。返事が来ているかを見るために使う。 */
+export async function listMyInquiries(clerkUserId: string, limit = 50): Promise<Inquiry[]> {
+  const sql = await db();
+  const rows = (await sql`
+    SELECT id, from_role, from_label, subject, body, answer, answered_at, created_at
+    FROM inquiries
+    WHERE from_clerk_id = ${clerkUserId}
+    ORDER BY created_at DESC
+    LIMIT ${limit}
+  `) as Record<string, unknown>[];
+  return rows.map(toInquiry);
+}
+
+/** まだ返事をしていない件数。主催者のタブに出す。 */
+export async function countOpenInquiries(): Promise<number> {
+  const sql = await db();
+  const rows = (await sql`
+    SELECT count(*)::int AS n FROM inquiries WHERE answer IS NULL
+  `) as { n: number }[];
+  return Number(rows[0]?.n ?? 0);
+}
+
+/**
+ * 主催者が返事をする。
+ * 一問一答なので、返事は 1 件につき 1 つ。書き直しはできる。
+ */
+export async function answerInquiry(id: number, answer: string): Promise<Result> {
+  const { MAX_INQUIRY_BODY, countChars } = await import('./domain');
+  const text = answer.trim();
+
+  if (!text) return fail('返事の内容を入れてください。');
+  if (countChars(text) > MAX_INQUIRY_BODY) {
+    return fail(`返事は ${MAX_INQUIRY_BODY} 文字までです。`);
+  }
+
+  const sql = await db();
+  const rows = (await sql`
+    UPDATE inquiries SET answer = ${text}, answered_at = now()
+    WHERE id = ${id}
+    RETURNING id
+  `) as { id: number }[];
+  return rows.length > 0 ? ok(undefined) : fail('その問い合わせは見つかりませんでした。');
+}
+
+// ─────────────────────────────────────────────────────────────
 // 会場の現在値をまとめて 1 回で返す（画面が数秒ごとに取りに来る）
 // ─────────────────────────────────────────────────────────────
 
@@ -745,15 +851,18 @@ export interface Snapshot {
   requests: OrderRequest[];
   batches: TicketBatch[];
   guest: Guest | null;
+  /** まだ返事をしていない問い合わせの件数。 */
+  openInquiries: number;
   serverTime: string;
 }
 
 export async function getSnapshot(clerkUserId?: string): Promise<Snapshot> {
-  const [event, breweries, requests, batches] = await Promise.all([
+  const [event, breweries, requests, batches, openInquiries] = await Promise.all([
     getEvent(),
     listBreweries(),
     listRequests(),
     listTicketBatches(),
+    countOpenInquiries(),
   ]);
   return {
     event,
@@ -761,6 +870,7 @@ export async function getSnapshot(clerkUserId?: string): Promise<Snapshot> {
     requests,
     batches,
     guest: clerkUserId ? await getOrCreateGuest(clerkUserId) : null,
+    openInquiries,
     serverTime: new Date().toISOString(),
   };
 }
