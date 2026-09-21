@@ -45,9 +45,10 @@ function Charge() {
 
   const submit = useCallback(
     (raw: string) => {
-      // 受付に貼ってある共通 QR を読み取ると、コードの入っていない URL が来る。
-      // それを券コードとして送ると「登録されていません」と出て驚かせるので、
-      // URL だったら中の code だけを取り出し、無ければ何もしない。
+      // 券の QR には /guest/charge?code=… が入っている（Issue #33）。
+      // URL だったら中の code だけを取り出す。code の無い URL（以前の共通 QR の
+      // 貼り紙が残っていた、など）は、券コードとして送ると「登録されていません」と
+      // 出て驚かせるので何もしない。
       let code = raw;
       if (/^https?:\/\//i.test(raw.trim())) {
         try {

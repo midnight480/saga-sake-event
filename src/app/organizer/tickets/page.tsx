@@ -36,8 +36,8 @@ export default function TicketsPage() {
         <Title>チケットQRの発行</Title>
         <div className="mt-2">
           <Note>
-            受付に貼る QR は 1 枚だけです。使い回せます。参加者はその QR で画面を開き、
-            紙の券に書かれたコードを打ち込みます。支払いと金額はこのアプリでは扱いません。
+            券は 1 枚ごとに QR が付いた形で印刷されます。参加者がその QR をスマートフォンの
+            カメラで読み取ると、ポイントが入ります。支払いと金額はこのアプリでは扱いません。
           </Note>
         </div>
       </ScreenHeader>
@@ -52,7 +52,7 @@ export default function TicketsPage() {
         </div>
       )}
 
-      <SharedQr />
+      <PrintGuide />
 
       <div className="flex flex-col gap-3 px-5 py-4">
         {snapshot.batches.map((batch) => (
@@ -225,40 +225,34 @@ function BatchCard({ batch }: { batch: TicketBatch }) {
 }
 
 /**
- * 受付に貼る共通 QR。
+ * 券の渡し方の案内と、印刷への入口。
  *
- * 券ごとに別の QR を刷るのをやめた。貼るのは 1 枚で、当日ずっと使い回せる。
- * 誰が何ポイント受け取るかは、紙に書かれたコードのほうで決まる。
+ * 以前はここに受付に貼る共通 QR を出していたが、コードが入っていないため
+ * 読み取っても何も起きなかった（Issue #33）。券 1 枚ごとに QR を付ける形に
+ * 戻したので、貼るものは無くなった。
  */
-function SharedQr() {
+function PrintGuide() {
   return (
     <div className="px-5">
       <Card>
         <div className="flex items-baseline justify-between gap-2">
-          <span className="font-display text-[18px] text-ink">受付に貼る QR</span>
-          <span className="text-[11.5px] leading-none text-ink-55">1 枚で使い回せます</span>
+          <span className="font-display text-[18px] text-ink">券の渡し方</span>
+          <span className="text-[11.5px] leading-none text-ink-55">1 枚に 1 つの QR</span>
         </div>
 
-        <div className="flex items-center gap-4">
-          <div className="size-28 flex-none rounded-lg bg-ink p-2">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/api/qr" alt="ポイントを追加する画面の QR コード" className="size-full" />
-          </div>
-          <p className="text-[12px] leading-[1.8] text-ink-55">
-            参加者はこの QR でポイントの画面を開き、
-            <strong className="font-bold text-ink">紙の券に書かれたコード</strong>
-            を打ち込みます。
-            <br />
-            券の種類はコードで見分けるので、QR は共通で構いません。
-          </p>
-        </div>
+        <p className="text-[12px] leading-[1.8] text-ink-55">
+          印刷した券を切り離して、受付で 1 人に 1 枚ずつ渡してください。
+          <br />
+          参加者は券の <strong className="font-bold text-ink">QR をカメラで読み取るだけ</strong>で
+          ポイントを受け取れます。カメラが使えない人は、QR の下のコードを打ち込めます。
+        </p>
 
         <Button
           tone="gold"
           block
           onClick={() => window.open('/organizer/tickets/print', '_blank')}
         >
-          QR とコードを印刷する
+          券を印刷する
         </Button>
       </Card>
     </div>

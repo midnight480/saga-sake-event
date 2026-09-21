@@ -80,7 +80,6 @@ src/
   app/
     actions.ts      画面から呼ぶ操作。権限確認はすべてここ
     api/snapshot/   会場の現在値を返す口（ポーリング先・節目のお知らせもここ）
-    api/qr/         受付に貼る共通 QR
     opengraph-image.tsx  リンクを貼ったときに出る画像
     setup/          セットアップ診断
     brewery-login/  酒蔵専用のログイン

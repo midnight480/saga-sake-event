@@ -8,10 +8,16 @@ import { listTicketBatches, listUnredeemedCodes } from '@/lib/store';
 export const dynamic = 'force-dynamic';
 
 /**
- * 受付に置くものを 1 枚にまとめた印刷用ページ。
+ * 券の印刷用ページ。切り離して 1 人 1 枚ずつ渡す。
  *
- * 上半分が、貼っておく共通 QR。当日ずっと使い回せる。
- * 下半分が、切り離して 1 人 1 枚ずつ渡すコード。こちらは一度きり。
+ * ★ 券 1 枚ごとに、そのコード入りの QR を付ける（Issue #33）★
+ * 以前は受付に共通の QR を 1 枚だけ貼り、券にはコードの文字だけを刷っていた。
+ * ところが共通 QR にはコードが入っていないので、参加者がアプリのカメラで
+ * 読んでも何も起きず、「QR が読み取れない」ことになっていた。
+ *
+ * 券の QR には /guest/charge?code=… を入れる。端末のカメラで読めばその画面が
+ * 開いてそのまま加算され、アプリ内のカメラで読んでも同じコードが取り出せる。
+ * QR の下にはコードの文字も残す。カメラが使えない端末でも打ち込めるように。
  */
 export default async function TicketPrintPage({
   searchParams,
@@ -31,17 +37,23 @@ export default async function TicketPrintPage({
   const protocol = host.startsWith('localhost') ? 'http' : 'https';
   const chargeUrl = `${protocol}://${host}/guest/charge`;
 
-  const qr = await QRCode.toString(chargeUrl, {
-    type: 'svg',
-    margin: 0,
-    errorCorrectionLevel: 'H',
-  });
+  // 誤り訂正は M。券は小さく刷るので、H にすると絵が細かくなりすぎて
+  // かえって読みにくい。手で持って読む距離なら M で足りる。
+  const qrOf = (code: string) =>
+    QRCode.toString(`${chargeUrl}?code=${encodeURIComponent(code)}`, {
+      type: 'svg',
+      margin: 0,
+      errorCorrectionLevel: 'M',
+    });
 
   const sections = await Promise.all(
-    targets.map(async (batch) => ({
-      batch,
-      codes: await listUnredeemedCodes(batch.id, limit),
-    })),
+    targets.map(async (batch) => {
+      const codes = await listUnredeemedCodes(batch.id, limit);
+      return {
+        batch,
+        tickets: await Promise.all(codes.map(async (code) => ({ code, qr: await qrOf(code) }))),
+      };
+    }),
   );
 
   return (
@@ -49,11 +61,12 @@ export default async function TicketPrintPage({
       <div className="mx-auto w-full max-w-[860px]">
         <div className="no-print mb-6 flex flex-col gap-3">
           <h1 className="font-display text-[26px] tracking-[0.05em] text-ink">
-            受付に置くもの ─ 印刷用
+            券 ─ 印刷用
           </h1>
           <p className="text-[12.5px] leading-[1.8] text-ink-55">
-            上の QR は 1 枚だけ貼れば、当日ずっと使い回せます。
-            下のコードは切り離して、1 人に 1 枚ずつお渡しください。
+            切り離して、1 人に 1 枚ずつお渡しください。券ごとに QR が付いていて、
+            参加者がスマートフォンのカメラで読み取るとポイントが入ります。
+            QR は 1 枚ごとに違うので、同じ券を二度使うことはできません。
           </p>
           <div className="flex flex-wrap gap-2">
             {[50, 100, 300, 500].map((n) => (
@@ -74,46 +87,33 @@ export default async function TicketPrintPage({
           </div>
         </div>
 
-        {/* ── 受付に貼る QR ── */}
-        <section className="mb-8 flex flex-col items-center gap-4 rounded-card border border-hairline bg-ink p-8 text-center print:break-after-page print:rounded-none print:border-black/40 print:bg-white">
-          <div className="text-[11px] tracking-[0.3em] text-black/55">佐賀 蔵めぐり</div>
-          <h2 className="font-display text-[26px] text-black">
-            お手元の券のコードを入れてください
-          </h2>
-          <div
-            className="w-full max-w-[320px] [&>svg]:h-auto [&>svg]:w-full"
-            dangerouslySetInnerHTML={{ __html: qr }}
-          />
-          <p className="text-[13px] leading-[1.9] text-black/70">
-            スマートフォンのカメラでこの QR を読み取り、
-            <br />
-            紙の券に書かれたコードを入力すると、ポイントが入ります。
-          </p>
-          <p className="font-mono text-[11px] break-all text-black/50">{chargeUrl}</p>
-        </section>
-
-        {/* ── 切り離して渡すコード ── */}
-        {sections.map(({ batch, codes }) => (
+        {/* ── 切り離して渡す券 ── */}
+        {sections.map(({ batch, tickets }) => (
           <section key={batch.id} className="mb-8">
             <h2 className="mb-3 font-display text-[20px] text-ink print:text-black">
-              {batch.label} ─ {batch.cupsPerTicket} ポイント（{codes.length} 件）
+              {batch.label} ─ {batch.cupsPerTicket} ポイント（{tickets.length} 件）
             </h2>
 
-            {codes.length === 0 ? (
+            {tickets.length === 0 ? (
               <p className="text-[12.5px] text-ink-55 print:text-black/60">
                 まだ発行されていません。「チケットQR」の画面で発行してください。
               </p>
             ) : (
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 print:grid-cols-3 print:gap-2">
-                {codes.map((code) => (
+                {tickets.map(({ code, qr }) => (
                   <article
                     key={code}
                     className="flex flex-col items-center gap-1.5 rounded-card border border-hairline bg-ink p-3 text-center print:break-inside-avoid print:rounded-none print:border-black/40 print:bg-white"
                   >
                     <div className="text-[9px] tracking-[0.24em] text-black/55">
-                      {batch.label}
+                      佐賀 蔵めぐり ・ {batch.label}
                     </div>
-                    <div className="font-mono text-[15px] font-bold tracking-wider text-black">
+                    {/* 印刷で 25mm 前後になる大きさ。スマホのカメラで手元から読める。 */}
+                    <div
+                      className="w-full max-w-[120px] [&>svg]:h-auto [&>svg]:w-full"
+                      dangerouslySetInnerHTML={{ __html: qr }}
+                    />
+                    <div className="font-mono text-[13px] font-bold tracking-wider break-all text-black">
                       {code}
                     </div>
                     <div className="text-[9px] leading-snug text-black/55">
