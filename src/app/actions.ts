@@ -106,6 +106,30 @@ export async function addBrewery(input: {
   });
 }
 
+/**
+ * 蔵アカウントに割り当てるメールアドレス。
+ *
+ * ★ なぜ要るのか ★
+ * Clerk はメールアドレスを必須にしている設定が既定で、username と password
+ * だけではユーザーを作れない。蔵の担当者は当日交代することもあり、個人の
+ * メールアドレスを聞いて回るのは現実的でないので、こちらで一意な値を作る。
+ *
+ * 受信はしない。ログインは蔵IDとパスワードで行う。会場のドメインの下に
+ * 置いて、何のアドレスか見て分かるようにしている。
+ */
+function breweryEmail(loginId: string): string {
+  const host = process.env.VERCEL_PROJECT_PRODUCTION_URL?.trim() || 'saga-sake-event.invalid';
+  return `${loginId}@kura.${host}`;
+}
+
+/** Clerk が返した理由を、そのまま画面に出せる形に整える。 */
+function clerkReason(error: unknown): string {
+  const errors = (error as { errors?: { message?: string; longMessage?: string }[] })?.errors;
+  const detail = errors?.map((e) => e.longMessage || e.message).filter(Boolean).join(' / ');
+  if (detail) return detail;
+  return error instanceof Error ? error.message : String(error);
+}
+
 /** 蔵用の Clerk ユーザーを作る。失敗しても蔵の登録自体は残す。 */
 async function createBreweryAccount(
   breweryId: string,
@@ -117,6 +141,9 @@ async function createBreweryAccount(
     const user = await client.users.createUser({
       username: loginId,
       password,
+      // メールアドレスが必須の設定でも作れるようにする。
+      // 管理 API から作った宛先は確認済みとして登録される。
+      emailAddress: [breweryEmail(loginId)],
       publicMetadata: { role: 'brewery', breweryId },
       skipPasswordChecks: false,
     });
@@ -124,10 +151,11 @@ async function createBreweryAccount(
     return { ok: true };
   } catch (error) {
     console.error('[clerk] 蔵アカウントを作成できませんでした', error);
+    // 決めつけた案内をしない。前は「Username を有効にしてください」と出して
+    // いたが、実際の原因が別のときに誤った方向へ誘導してしまう。
     return {
       ok: false,
-      warning:
-        'この蔵のログインアカウントを作れませんでした。Clerk の設定で「Username」と「Password」を有効にしてから、一覧の「アカウントを作り直す」を押してください。',
+      warning: `この蔵のログインアカウントを作れませんでした。理由: ${clerkReason(error)}`,
     };
   }
 }

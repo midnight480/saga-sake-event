@@ -54,7 +54,7 @@ function Charge() {
       startTransition(async () => {
         const result = await redeemTicket(normalized);
         if (result.ok && result.value) {
-          setSuccess(`${result.value.label} を読み取りました。＋${result.value.added} 枚`);
+          setSuccess(`${result.value.label} を読み取りました。＋${result.value.added} ポイント`);
           setLog((prev) => [
             {
               time: new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' }),
@@ -86,14 +86,14 @@ function Charge() {
   return (
     <>
       <ScreenHeader>
-        <Title>チケットを追加</Title>
+        <Title>ポイントを追加</Title>
         <p className="mt-2 text-[12px] leading-[1.7] text-ink-55">
           お手持ちの券のQRを読み取ってください。前売券・当日券のどちらも、同じ残高に入ります。
         </p>
         {guest && (
           <div className="mt-2.5 flex items-baseline gap-1.5">
             <span className="font-display text-[26px] text-gold">{guest.tickets}</span>
-            <span className="text-[12px] text-ink-55">枚（現在の残高）</span>
+            <span className="text-[12px] text-ink-55">ポイント（現在の残高）</span>
           </div>
         )}
       </ScreenHeader>
@@ -143,7 +143,7 @@ function Charge() {
                 <span className="min-w-0 truncate text-ink-55">
                   {entry.time} ・ {entry.code}
                 </span>
-                <span className="flex-none font-bold text-matcha">＋{entry.cups} 枚</span>
+                <span className="flex-none font-bold text-matcha">＋{entry.cups} ポイント</span>
               </div>
             ))
           )}

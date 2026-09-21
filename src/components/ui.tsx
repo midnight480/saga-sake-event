@@ -391,3 +391,65 @@ export function LeftBadge({ left }: { left: number }) {
     </span>
   );
 }
+
+/**
+ * 取り返しのつきにくい操作の前に挟む確認ダイアログ。
+ *
+ * 押し間違いを防ぐのが目的なので、既定の重みは「やめる」側に置いている。
+ * 画面の外側を押すか Esc でも取り消せる。
+ */
+export function ConfirmDialog({
+  open,
+  title,
+  children,
+  confirmLabel,
+  cancelLabel = 'いいえ',
+  onConfirm,
+  onCancel,
+  pending,
+}: {
+  open: boolean;
+  title: string;
+  children: ReactNode;
+  confirmLabel: string;
+  cancelLabel?: string;
+  onConfirm: () => void;
+  onCancel: () => void;
+  pending?: boolean;
+}) {
+  if (!open) return null;
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-5 sm:items-center"
+      onClick={onCancel}
+      onKeyDown={(e) => {
+        if (e.key === 'Escape') onCancel();
+      }}
+      role="presentation"
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
+        // 中身を押したときに、外側の取り消しへ伝わらないようにする。
+        onClick={(e) => e.stopPropagation()}
+        className="rise-in flex w-full max-w-[420px] flex-col gap-4 rounded-screen border border-hairline-strong bg-card p-5 shadow-[0_24px_60px_rgba(0,0,0,0.5)]"
+      >
+        <h2 className="font-display text-[20px] tracking-[0.04em] text-ink">{title}</h2>
+        <div className="text-[12.5px] leading-[1.9] text-ink-70">{children}</div>
+
+        <div className="mt-1 flex flex-col gap-2">
+          {/* 「はい」は通常の見た目。押し間違いを誘わないよう強調しない。 */}
+          <Button tone="ghost" block onClick={onConfirm} disabled={pending}>
+            {pending ? '処理しています…' : confirmLabel}
+          </Button>
+          {/* 「いいえ」を赤く目立たせて、迷ったらこちらを選べるようにする。 */}
+          <Button tone="danger" block onClick={onCancel} disabled={pending}>
+            {cancelLabel}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}

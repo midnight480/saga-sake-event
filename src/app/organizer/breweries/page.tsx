@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react';
 
-import { addBrewery, moveBooth, regenerateBreweryPassword, removeBrewery } from '@/app/actions';
+import { addBrewery, regenerateBreweryPassword, removeBrewery } from '@/app/actions';
 import {
   AddBox,
   Button,
@@ -99,9 +99,6 @@ export default function BreweriesPage() {
             placeholder="酒蔵名（例：天山酒造）"
             className={inputClass}
           />
-          <Note>
-            ブース番号は自動で割り当てます（あとから前後にずらせます）。
-          </Note>
           <Button tone="go" block onClick={submit} disabled={pending || !name.trim()}>
             {pending ? '発行しています…' : '登録してID・パスワードを発行'}
           </Button>
@@ -234,14 +231,6 @@ function BreweryCard({ brewery }: { brewery: Brewery }) {
     });
   };
 
-  const shiftBooth = (direction: 1 | -1) => {
-    startTransition(async () => {
-      const result = await moveBooth(brewery.id, direction);
-      if (!result.ok) setError(result.reason);
-      await refresh();
-    });
-  };
-
   return (
     <Card animate>
       <div className="flex items-start justify-between gap-2.5">
@@ -292,36 +281,12 @@ function BreweryCard({ brewery }: { brewery: Brewery }) {
             {brewery.loginId}
           </dd>
         </div>
-        <div className="flex items-center justify-between gap-2.5">
-          <dt className="flex-none text-[11.5px] leading-none text-ink-55">ブース</dt>
-          <dd className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => shiftBooth(-1)}
-              aria-label="ブースを前にずらす"
-              className="size-11 rounded-[9px] border border-hairline-strong text-ink-55 hover:text-ink"
-            >
-              ‹
-            </button>
-            <span className="min-w-14 text-center font-mono text-[15px] font-bold text-ink">
-              {brewery.booth || '未割当'}
-            </span>
-            <button
-              type="button"
-              onClick={() => shiftBooth(1)}
-              aria-label="ブースを次にずらす"
-              className="size-11 rounded-[9px] border border-hairline-strong text-ink-55 hover:text-ink"
-            >
-              ›
-            </button>
-          </dd>
-        </div>
       </dl>
 
       {!brewery.hasLoginAccount && !fresh && (
         <Notice tone="warn" title="この蔵はまだログインできません">
-          ログイン用のアカウントが作られていません。Clerk の設定で「Username」が有効になっているか
-          確かめてから、下のボタンを押してください。
+          ログイン用のアカウントが作られていません。下のボタンを押すと作成します。
+          失敗したときは、その理由がここに出ます。
         </Notice>
       )}
 

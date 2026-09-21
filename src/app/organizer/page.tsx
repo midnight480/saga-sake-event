@@ -82,7 +82,7 @@ export default function OrganizerDashboard() {
       <div className="grid grid-cols-2 gap-px border-b border-hairline bg-hairline">
         <Kpi label="出展蔵" value={`${breweries.length} / ${event.targetBreweryCount}`} unit="蔵" />
         <Kpi label="残り在庫" value={totalLeft} unit="杯" />
-        <Kpi label="販売できる当日券" value={sameDayForSale} unit="枚" />
+        <Kpi label="まだ売れる当日券" value={sameDayForSale} unit="枚" />
         <Kpi label="前売 未読取" value={advance ? batchForSale(advance) : 0} unit="枚" />
         <Kpi label="受渡完了" value={delivered} unit="件" />
         <Kpi label="対応待ち" value={openCount} unit="件" />
@@ -98,9 +98,9 @@ export default function OrganizerDashboard() {
         <div className="px-5 pt-4">
           <Notice tone="warn" title="チケットだけが売り切れています">
             会場にはまだ <strong className="font-bold text-ink">{stockTickets}</strong>{' '}
-            枚分の在庫があります。当日券を追加発行すれば、来場者はそのまま飲み続けられます。
+            ポイント分の在庫があります。当日券を追加で刷れば、来場者はそのまま飲み続けられます。
             <Button tone="go" block className="mt-3" onClick={addDayTickets} disabled={pending}>
-              {pending ? '発行しています…' : '当日券を100枚 追加発行する'}
+              {pending ? '発行しています…' : '当日券を100枚 追加で刷る'}
             </Button>
           </Notice>
         </div>
@@ -192,7 +192,7 @@ function BreweryRow({ brewery, waiting }: { brewery: Brewery; waiting: number })
                       {item.kind} / 精米 {item.polish}% / {item.size}
                     </span>
                     <span className="flex-none whitespace-nowrap text-gold">
-                      チケット {item.ticketCost} 枚
+                      {item.ticketCost} ポイント
                     </span>
                   </div>
                 </div>

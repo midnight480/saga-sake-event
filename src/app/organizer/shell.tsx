@@ -1,6 +1,7 @@
 'use client';
 
 import { AppShell, type Tab } from '@/components/AppShell';
+import { orderingStatus } from '@/lib/domain';
 import { useSnapshot } from '@/lib/useSnapshot';
 
 const TABS: Tab[] = [
@@ -18,7 +19,9 @@ export function OrganizerShell({ children }: { children: React.ReactNode }) {
     <AppShell
       role="主催者"
       roleEn="ORGANIZER"
-      phase={snapshot?.event.phase}
+      status={
+        snapshot ? orderingStatus(snapshot.event, new Date(snapshot.serverTime)) : undefined
+      }
       tabs={TABS}
       stale={isStale}
     >

@@ -56,7 +56,8 @@ export async function getEvent(): Promise<EventSettings> {
     eventDate: toDateString(row?.event_date),
     startTime: String(row?.start_time ?? '11:00'),
     endTime: String(row?.end_time ?? '16:00'),
-    phase: (row?.phase as EventPhase) ?? 'before',
+    // 'before' は旧データ。移行前に読んでも壊れないよう auto に寄せる。
+    phase: row?.phase === 'open' || row?.phase === 'closed' ? row.phase : 'auto',
     targetBreweryCount: Number(row?.target_brewery_count ?? 30),
   };
 }
@@ -197,11 +198,9 @@ export async function createBrewery(input: {
   const loginId = await nextLoginId();
   const password = generatePassword();
 
-  // 空いているブースを 1 つ自動で割り当てる（未割当なら空欄のまま）。
-  const taken = (await sql`SELECT booth FROM breweries`) as { booth: string }[];
-  const used = new Set(taken.map((t) => t.booth));
-  const { BOOTHS } = await import('./domain');
-  const booth = BOOTHS.find((b) => !used.has(b)) ?? '';
+  // ブース番号は割り当てない。主催者が画面から変えられない番号を配ると、
+  // 実際の配置と食い違ったまま来場者を別の場所へ案内してしまう。
+  const booth = '';
 
   await sql`
     INSERT INTO breweries (id, name, area, booth, login_id, sort_order)
@@ -270,7 +269,10 @@ export async function addItem(
 ): Promise<Result<{ id: string }>> {
   const name = input.name.trim();
   if (!name) return fail('銘柄名を入力してください。');
-  if (input.ticketCost < 1 || input.ticketCost > 3) return fail('チケット枚数は 1〜3 です。');
+  const { MAX_TICKET_COST } = await import('./domain');
+  if (input.ticketCost < 1 || input.ticketCost > MAX_TICKET_COST) {
+    return fail(`ポイントは 1〜${MAX_TICKET_COST} です。`);
+  }
 
   const sql = await db();
   const id = `item_${randomInt(1e9).toString(36)}${Date.now().toString(36)}`;
@@ -309,7 +311,10 @@ export async function changeBottles(itemId: string, delta: number): Promise<Resu
 }
 
 export async function setItemTicketCost(itemId: string, ticketCost: number): Promise<Result> {
-  if (ticketCost < 1 || ticketCost > 3) return fail('チケット枚数は 1〜3 です。');
+  const { MAX_TICKET_COST } = await import('./domain');
+  if (ticketCost < 1 || ticketCost > MAX_TICKET_COST) {
+    return fail(`ポイントは 1〜${MAX_TICKET_COST} です。`);
+  }
   const sql = await db();
   const rows = (await sql`
     UPDATE items SET ticket_cost = ${ticketCost} WHERE id = ${itemId} RETURNING id
@@ -571,7 +576,7 @@ export async function setGuestKind(clerkUserId: string, kind: GuestKind): Promis
   `) as { clerk_user_id: string }[];
   return rows.length > 0
     ? ok(undefined)
-    : fail('すでにチケットを使っているため、参加区分は変更できません。');
+    : fail('すでにポイントを使っているため、参加区分は変更できません。');
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -621,17 +626,21 @@ export async function createRequest(input: {
   itemId: string;
   cups: number;
 }): Promise<Result<{ id: number; spent: number }>> {
-  const { MAX_CUPS_PER_REQUEST, isOrderingOpen } = await import('./domain');
+  const { MAX_CUPS_PER_REQUEST } = await import('./domain');
   if (input.cups < 1 || input.cups > MAX_CUPS_PER_REQUEST) {
     return fail(`一度に頼めるのは 1〜${MAX_CUPS_PER_REQUEST} 杯です。`);
   }
 
   const event = await getEvent();
-  if (!isOrderingOpen(event)) {
+  const { orderingStatus } = await import('./domain');
+  const status = orderingStatus(event);
+  if (!status.open) {
     return fail(
-      event.phase === 'closed'
-        ? 'イベントは終了しました。'
-        : `${event.startTime} の開始までリクエストは送れません。`,
+      status.manual
+        ? 'いま主催者が受付を停止しています。'
+        : status.label === '終了'
+          ? 'イベントは終了しました。'
+          : `${event.startTime} の開始までリクエストは送れません。`,
     );
   }
 

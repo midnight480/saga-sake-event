@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import type { ReactNode } from 'react';
 
-import type { EventPhase } from '@/lib/domain';
+import type { OrderingStatus } from '@/lib/domain';
 
 export interface Tab {
   href: string;
@@ -23,7 +23,7 @@ export function AppShell({
   role,
   roleEn,
   subject,
-  phase,
+  status,
   tabs,
   stale,
   children,
@@ -31,7 +31,7 @@ export function AppShell({
   role: string;
   roleEn: string;
   subject?: string;
-  phase?: EventPhase;
+  status?: OrderingStatus;
   tabs: Tab[];
   stale?: boolean;
   children: ReactNode;
@@ -49,7 +49,7 @@ export function AppShell({
               {subject ? ` ─ ${subject}` : ''}
             </span>
           </div>
-          {phase && <PhaseChip phase={phase} />}
+          {status && <StatusChip status={status} />}
         </header>
 
         {stale && (
@@ -94,20 +94,17 @@ export function AppShell({
   );
 }
 
-const PHASE_TEXT: Record<EventPhase, string> = {
-  before: '開始前',
-  open: '開催中',
-  closed: '終了',
-};
-
-function PhaseChip({ phase }: { phase: EventPhase }) {
-  const dot =
-    phase === 'open' ? 'bg-matcha' : phase === 'before' ? 'bg-gold' : 'bg-ink/40';
+/**
+ * いま受付をしているかどうかの表示。
+ * 予定どおりか、主催者が手で決めたのかが分かるようにしている。
+ */
+function StatusChip({ status }: { status: OrderingStatus }) {
+  const dot = status.open ? 'bg-matcha' : status.manual ? 'bg-terracotta' : 'bg-gold';
   return (
     <span className="flex flex-none items-center gap-2 rounded-full border border-hairline-strong bg-card px-3 py-1.5">
-      <span className={`size-[7px] rounded-full ${dot} ${phase === 'open' ? 'pulse-dot' : ''}`} />
+      <span className={`size-[7px] rounded-full ${dot} ${status.open ? 'pulse-dot' : ''}`} />
       <span className="text-[11.5px] font-bold leading-none whitespace-nowrap text-ink">
-        {PHASE_TEXT[phase]}
+        {status.label}
       </span>
     </span>
   );

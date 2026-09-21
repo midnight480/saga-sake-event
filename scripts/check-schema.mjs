@@ -164,8 +164,8 @@ async function main() {
   const broke = await order('u1', 'i1', 1);
   check('残高不足は断られる', broke.ok === false);
   check(
-    '不足枚数を具体的に伝える',
-    typeof broke.reason === 'string' && broke.reason.includes('2 枚 足りません'),
+    '不足ポイントを具体的に伝える',
+    typeof broke.reason === 'string' && broke.reason.includes("2 足りません"),
     `reason=${broke.reason}`,
   );
   check('断られたときチケットは減っていない', (await ticketsOf()).tickets === 0);

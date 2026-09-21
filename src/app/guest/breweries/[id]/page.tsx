@@ -16,8 +16,8 @@ import {
 } from '@/components/ui';
 import {
   MAX_CUPS_PER_REQUEST,
-  isOrderingOpen,
   itemAvailableCups,
+  orderingStatus,
   waitingCount,
   type Item,
 } from '@/lib/domain';
@@ -42,7 +42,8 @@ export default function GuestBreweryDetailPage() {
   }
 
   const waiting = waitingCount(snapshot.requests, brewery.id);
-  const beforeStart = !isOrderingOpen(snapshot.event, new Date(snapshot.serverTime));
+  // 受付が閉じている理由まで見て、参加者に伝える言葉を変える。
+  const status = orderingStatus(snapshot.event, new Date(snapshot.serverTime));
   const guest = snapshot.guest;
 
   return (
@@ -61,18 +62,23 @@ export default function GuestBreweryDetailPage() {
             .join(' ・ ')}
         </div>
         {guest && (
-          <div className="mt-2 text-[12px] leading-none text-gold">
-            チケット残り {guest.tickets} 枚
+          <div className="mt-2 flex items-baseline gap-1.5">
+            <span className="font-display text-[24px] leading-none text-gold">
+              {guest.tickets}
+            </span>
+            <span className="text-[12px] text-ink-55">ポイント 持っています</span>
           </div>
         )}
       </header>
 
-      {beforeStart && (
+      {!status.open && (
         <div className="px-5 pt-4">
           <Notice tone="info">
-            {snapshot.event.phase === 'closed'
-              ? 'イベントは終了しました。'
-              : `${snapshot.event.startTime} の開始までリクエストは送れません。`}
+            {status.manual
+              ? 'いま主催者が受付を止めています。再開までお待ちください。'
+              : status.label === '終了'
+                ? 'イベントは終了しました。'
+                : `${snapshot.event.startTime} の開始までリクエストは送れません。`}
           </Notice>
         </div>
       )}
@@ -92,14 +98,8 @@ export default function GuestBreweryDetailPage() {
               key={item.id}
               item={item}
               tickets={guest?.tickets ?? 0}
-              blocked={beforeStart || !brewery.accepting}
-              blockedReason={
-                beforeStart
-                  ? snapshot.event.phase === 'closed'
-                    ? '終了しました'
-                    : '開始前'
-                  : '受付停止中'
-              }
+              blocked={!status.open || !brewery.accepting}
+              blockedReason={!status.open ? status.label : '受付停止中'}
             />
           ))
         )}
@@ -138,8 +138,8 @@ function OrderCard({
     : blocked
       ? blockedReason
       : notEnough
-        ? 'チケット不足'
-        : `${need} 枚でリクエスト`;
+        ? `あと ${need - tickets} ポイント 必要です`
+        : `${need} ポイントでリクエスト`;
 
   const submit = () => {
     setError(null);
@@ -164,8 +164,13 @@ function OrderCard({
           <span className="text-[11.5px] leading-[1.6] text-ink-55">
             {item.kind} / 精米 {item.polish}% ・ {item.size}
           </span>
-          <span className="text-[11.5px] leading-none font-bold whitespace-nowrap text-gold">
-            チケット {item.ticketCost} 枚 / 杯
+          <span
+            className={`text-[11.5px] leading-none font-bold whitespace-nowrap ${
+              item.ticketCost <= tickets ? 'text-gold' : 'text-terracotta-soft'
+            }`}
+          >
+            1 杯 {item.ticketCost} ポイント
+            {item.ticketCost > tickets && '（足りません）'}
           </span>
         </div>
         <LeftBadge left={left} />
@@ -198,7 +203,7 @@ function OrderCard({
             href="/guest/charge"
             className="text-center text-[11.5px] leading-none text-gold underline"
           >
-            チケットを追加する
+            ポイントを追加する
           </Link>
         )}
       </div>

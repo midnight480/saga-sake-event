@@ -54,9 +54,9 @@ export default function GuestHome() {
         <Eyebrow>TICKETS</Eyebrow>
         <div className="flex items-baseline gap-2">
           <span className="font-display text-[56px] leading-none text-ink">{guest.tickets}</span>
-          <span className="text-[15px] text-ink-55">枚</span>
+          <span className="text-[15px] text-ink-55">ポイント</span>
           <span className="ml-auto flex-none text-[11.5px] leading-none whitespace-nowrap text-ink-45">
-            使用済 {guest.used} 枚
+            使用済 {guest.used} ポイント
           </span>
         </div>
 
@@ -64,7 +64,7 @@ export default function GuestHome() {
           href="/guest/charge"
           className="mt-5 flex min-h-12 items-center justify-center rounded-field border border-gold/50 text-[13px] font-bold tracking-[0.08em] text-gold transition-colors hover:bg-gold/12"
         >
-          会場でチケットを追加する
+          会場でポイントを追加する
         </Link>
       </header>
 
@@ -87,7 +87,7 @@ export default function GuestHome() {
                       {request.brand}
                     </span>
                     <span className="text-[11.5px] leading-none text-ink-55">
-                      {brewery?.name ?? '―'} ・ {request.cups} 杯 ・ {request.ticketCost} 枚
+                      {brewery?.name ?? '―'} ・ {request.cups} 杯 ・ {request.ticketCost} ポイント
                       {brewery?.booth ? ` ・ ${brewery.booth}` : ''}
                     </span>
                   </div>
@@ -129,7 +129,7 @@ function ChooseKind() {
         <Title size="lg">参加区分をえらぶ</Title>
         <div className="mt-3">
           <Note>
-            えらぶと、その区分のチケットが配られます。あとから変えられないので、
+            えらぶと、その区分のポイントが配られます。あとから変えられないので、
             お手元の案内をご確認ください。
           </Note>
         </div>
@@ -145,10 +145,10 @@ function ChooseKind() {
 
       <Card>
         <div className="flex items-baseline justify-between">
-          <span className="text-[12px] text-ink-55">配られるチケット</span>
+          <span className="text-[12px] text-ink-55">配られるポイント</span>
           <span>
             <span className="font-display text-[30px] text-gold">{INITIAL_TICKETS[kind]}</span>
-            <span className="ml-1 text-[12px] text-ink-55">枚</span>
+            <span className="ml-1 text-[12px] text-ink-55">ポイント</span>
           </span>
         </div>
       </Card>

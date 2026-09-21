@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react';
 
-import { discardTickets, issueTickets, setCupsPerTicket } from '@/app/actions';
+import { discardTickets, issueTickets } from '@/app/actions';
 import {
   Button,
   Card,
@@ -36,18 +36,18 @@ export default function TicketsPage() {
         <Title>チケットQRの発行</Title>
         <div className="mt-2">
           <Note>
-            券種ごとに、1枚あたりのチケット枚数と発行枚数を決めて印刷します。
-            支払いと金額はこのアプリでは扱いません。参加者が券のQRを読み取ると、その場で加算されます。
+            券種ごとに、何枚 刷るかを決めて印刷します。支払いと金額はこのアプリでは扱いません。
+            参加者が券のQRを読み取ると、その場でポイントが入ります。
           </Note>
         </div>
       </ScreenHeader>
 
       {total === 0 && (
         <div className="px-5 pt-4">
-          <Notice tone="info" title="まだ 1 枚も発行されていません">
-            前売券・当日券それぞれについて、
-            <strong className="font-bold text-ink">1枚あたりのチケット枚数</strong>を決めてから、
-            必要な枚数を発行してください。前売を使わない場合は、当日券だけで運用できます。
+          <Notice tone="info" title="まだ 1 枚も刷られていません">
+            先に「イベント設定」で
+            <strong className="font-bold text-ink">1 枚で渡すポイント</strong>を決めてから、
+            ここで必要な枚数を刷ってください。前売を使わない場合は、当日券だけで運用できます。
           </Notice>
         </div>
       )}
@@ -86,13 +86,10 @@ function BatchCard({ batch }: { batch: TicketBatch }) {
   const [done, setDone] = useState<string | null>(null);
 
   const [count, setCount] = useState(50);
-  const [cups, setCups] = useState(batch.cupsPerTicket);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
 
   const forSale = batchForSale(batch);
   const percent = batch.issued > 0 ? Math.round((batch.redeemed / batch.issued) * 100) : 0;
-  // 発行してしまうと券の価値が変わるため、1 枚も無いときだけ枚数を変えられる。
-  const canChangeCups = batch.issued === 0;
 
   const act = (fn: () => Promise<{ ok: boolean; reason?: string }>, message: string) => {
     setError(null);
@@ -146,39 +143,15 @@ function BatchCard({ batch }: { batch: TicketBatch }) {
       {error && <Notice tone="danger">{error}</Notice>}
       {done && <Notice tone="info">{done}</Notice>}
 
-      {/* ── 1 枚あたりのチケット枚数 ── */}
-      <div className="flex flex-col gap-2 border-t border-hairline pt-3">
-        <Field
-          label="この券 1 枚で、チケット何枚分にするか"
-          hint={
-            canChangeCups
-              ? '1 杯あたり 1〜3 枚です。'
-              : 'すでに発行した券があるため変更できません。変えるには、下の「発行した券を取り消す」で 0 枚に戻してください。'
-          }
-        >
-          <div className="rounded-field border border-hairline-strong bg-card px-3.5 py-2.5">
-            <Stepper
-              label="チケット枚数"
-              unit="枚分"
-              value={cups}
-              onDecrease={() =>
-                act(() => setCupsPerTicket(batch.id, Math.max(1, cups - 1)).then((r) => {
-                  if (r.ok) setCups((v) => Math.max(1, v - 1));
-                  return r;
-                }), '1枚あたりの枚数を変更しました。')
-              }
-              onIncrease={() =>
-                act(() => setCupsPerTicket(batch.id, cups + 1).then((r) => {
-                  if (r.ok) setCups((v) => v + 1);
-                  return r;
-                }), '1枚あたりの枚数を変更しました。')
-              }
-              decreaseDisabled={!canChangeCups || pending || cups <= 1}
-              increaseDisabled={!canChangeCups || pending}
-            />
-          </div>
-        </Field>
+      <div className="flex items-baseline justify-between gap-2 border-t border-hairline pt-3 text-[11.5px] leading-none">
+        <span className="text-ink-55">1 枚で渡すポイント</span>
+        <span className="text-ink">
+          <span className="font-bold text-gold">{batch.cupsPerTicket}</span> ポイント
+        </span>
       </div>
+      <p className="-mt-1 text-[11px] leading-[1.6] text-ink-45">
+        ポイント数は「イベント設定」の画面で変えられます。
+      </p>
 
       {/* ── 発行する枚数 ── */}
       <div className="flex flex-col gap-2.5 border-t border-hairline pt-3">

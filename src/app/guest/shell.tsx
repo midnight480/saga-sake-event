@@ -1,6 +1,7 @@
 'use client';
 
 import { AppShell, type Tab } from '@/components/AppShell';
+import { orderingStatus } from '@/lib/domain';
 import { useSnapshot } from '@/lib/useSnapshot';
 
 const TABS: Tab[] = [
@@ -17,7 +18,9 @@ export function GuestShell({ children }: { children: React.ReactNode }) {
       role="参加者"
       roleEn="GUEST"
       subject={snapshot?.guest?.displayNo}
-      phase={snapshot?.event.phase}
+      status={
+        snapshot ? orderingStatus(snapshot.event, new Date(snapshot.serverTime)) : undefined
+      }
       tabs={TABS}
       stale={isStale}
     >
