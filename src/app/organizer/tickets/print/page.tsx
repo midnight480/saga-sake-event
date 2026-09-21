@@ -107,7 +107,7 @@ export default async function TicketPrintPage({
               <div className="text-[9px] leading-snug text-black/55">
                 スマートフォンで読み取ると
                 <br />
-                チケット {batch.cupsPerTicket} 枚が入ります
+                {batch.cupsPerTicket} ポイントが入ります
               </div>
             </article>
           ))}

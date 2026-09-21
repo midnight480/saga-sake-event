@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useTransition } from 'react';
 
-import { saveEvent, setPhase, setTicketCount } from '@/app/actions';
+import { saveEvent, setCupsPerTicket, setPhase } from '@/app/actions';
 import {
   Button,
   Card,
@@ -151,11 +151,11 @@ export default function EventSettingsPage() {
 
       </div>
 
-      <SectionLabel>用意するチケット</SectionLabel>
+      <SectionLabel>券種ごとのポイント</SectionLabel>
       <div className="flex flex-col gap-3 px-5">
         <Note>
-          券種ごとに何枚 用意するかを決めます。その枚数の QR が発行され、
-          「チケットQR」の画面から印刷できます。
+          前売券・当日券を 1 枚 読み取った参加者に、何ポイント渡すかを決めます。
+          券を何枚 刷るかは「チケットQR」の画面で決めます。
         </Note>
         {snapshot.batches.map((batch) => (
           <TicketPlan key={batch.id} batch={batch} />
@@ -238,34 +238,24 @@ export default function EventSettingsPage() {
 }
 
 /**
- * 券種ごとに「何枚 用意するか」だけを決める。
+ * 券種ごとに「参加者へ何ポイント渡すか」を決める。
  *
- * 入力は「あと何枚 足すか」ではなく総数。主催者が考えているのは
- * 「前売を 300 枚」であって差分ではないので、引き算はこちらでやる。
- *
- * 1 枚が何枚分になるかは、ここでは扱わない。決めることが 2 つあると
- * どちらを入れる欄か分からなくなるため、「チケットQR」の画面に寄せている。
+ * 前売と当日で額を変えたいことがある（前売は少し多めにする、など）ので
+ * 券種ごとに持つ。券を何枚 刷るかは別の話なので「チケットQR」に置いている。
  */
 function TicketPlan({ batch }: { batch: TicketBatch }) {
   const { refresh } = useSnapshot();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
-  const [done, setDone] = useState<string | null>(null);
-  const [target, setTarget] = useState(batch.issued);
 
-  const changed = target !== batch.issued;
+  // 発行して配ってしまうと券の値打ちが変わるので、1 枚も無いときだけ変えられる。
+  const canChange = batch.issued === 0;
 
-  const apply = () => {
+  const change = (next: number) => {
     setError(null);
-    setDone(null);
     startTransition(async () => {
-      const result = await setTicketCount(batch.id, target);
+      const result = await setCupsPerTicket(batch.id, next);
       if (!result.ok) setError(result.reason);
-      else if (result.value) {
-        const { added, removed } = result.value;
-        if (added > 0) setDone(`${added} 枚 追加しました。`);
-        else if (removed > 0) setDone(`${removed} 枚 減らしました。`);
-      }
       await refresh();
     });
   };
@@ -275,30 +265,30 @@ function TicketPlan({ batch }: { batch: TicketBatch }) {
       <div className="flex items-baseline justify-between gap-2">
         <span className="font-display text-[18px] text-ink">{batch.label}</span>
         <span className="text-[11.5px] leading-none text-ink-55">
-          いま {batch.issued} 枚（読取済 {batch.redeemed} 枚）
+          刷った券 {batch.issued} 枚
         </span>
       </div>
 
       {error && <Notice tone="danger">{error}</Notice>}
-      {done && <Notice tone="info">{done}</Notice>}
 
-      <div className="flex items-stretch gap-2">
-        <input
-          type="number"
-          inputMode="numeric"
-          min={batch.redeemed}
-          max={5000}
-          value={target}
-          onChange={(e) => setTarget(Math.max(0, Math.min(5000, Number(e.target.value) || 0)))}
-          aria-label={`${batch.label}を何枚 用意するか`}
-          className={`${inputClass} flex-1 text-right text-[20px]`}
+      <div className="rounded-field border border-hairline-strong bg-card px-3.5 py-2.5">
+        <Stepper
+          label="割り当てるポイント"
+          unit="ポイント"
+          value={batch.cupsPerTicket}
+          onDecrease={() => change(Math.max(1, batch.cupsPerTicket - 1))}
+          onIncrease={() => change(batch.cupsPerTicket + 1)}
+          decreaseDisabled={!canChange || pending || batch.cupsPerTicket <= 1}
+          increaseDisabled={!canChange || pending}
         />
-        <span className="flex flex-none items-center text-[13px] text-ink-55">枚</span>
-        <Button tone="go" className="flex-none px-5" onClick={apply} disabled={pending || !changed}>
-          {pending ? '…' : '用意する'}
-        </Button>
       </div>
 
+      {!canChange && (
+        <p className="text-[11px] leading-[1.7] text-ink-45">
+          すでに {batch.issued} 枚 刷っているため変更できません。変えるには「チケットQR」の
+          画面で、刷った券をいったん取り消してください。
+        </p>
+      )}
     </Card>
   );
 }

@@ -124,7 +124,7 @@ export const STATUS_MESSAGE: Record<RequestStatus, string> = {
   preparing: 'いま注いでいます。ブース前でお待ちください。',
   ready: 'できあがりました。ブースで受け取ってください。',
   delivered: 'お渡し済みです。ありがとうございました。',
-  cancelled: 'この注文は取り消されました。チケットは戻ります。',
+  cancelled: 'この注文は取り消されました。ポイントは戻ります。',
 };
 
 /** 状態ごとに蔵が押せるボタン。ここが注文の遷移表そのもの。 */

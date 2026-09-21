@@ -203,14 +203,14 @@ export const STATEMENTS: string[] = [
      SELECT tickets, display_no INTO v_tickets, v_label
        FROM guests WHERE clerk_user_id = p_user FOR UPDATE;
      IF NOT FOUND THEN
-       RETURN QUERY SELECT false, 'チケット残高が見つかりません。画面を更新してください。'::text,
+       RETURN QUERY SELECT false, 'ポイントの残高が見つかりません。画面を更新してください。'::text,
                            NULL::bigint, NULL::integer;
        RETURN;
      END IF;
 
      IF v_tickets < v_spend THEN
        RETURN QUERY SELECT false,
-         format('チケットが %s 枚 足りません。', v_spend - v_tickets)::text,
+         format('ポイントが %s 足りません。', v_spend - v_tickets)::text,
          NULL::bigint, NULL::integer;
        RETURN;
      END IF;

@@ -271,7 +271,7 @@ export async function addItem(
   if (!name) return fail('銘柄名を入力してください。');
   const { MAX_TICKET_COST } = await import('./domain');
   if (input.ticketCost < 1 || input.ticketCost > MAX_TICKET_COST) {
-    return fail(`チケット枚数は 1〜${MAX_TICKET_COST} です。`);
+    return fail(`ポイントは 1〜${MAX_TICKET_COST} です。`);
   }
 
   const sql = await db();
@@ -313,7 +313,7 @@ export async function changeBottles(itemId: string, delta: number): Promise<Resu
 export async function setItemTicketCost(itemId: string, ticketCost: number): Promise<Result> {
   const { MAX_TICKET_COST } = await import('./domain');
   if (ticketCost < 1 || ticketCost > MAX_TICKET_COST) {
-    return fail(`チケット枚数は 1〜${MAX_TICKET_COST} です。`);
+    return fail(`ポイントは 1〜${MAX_TICKET_COST} です。`);
   }
   const sql = await db();
   const rows = (await sql`
@@ -576,7 +576,7 @@ export async function setGuestKind(clerkUserId: string, kind: GuestKind): Promis
   `) as { clerk_user_id: string }[];
   return rows.length > 0
     ? ok(undefined)
-    : fail('すでにチケットを使っているため、参加区分は変更できません。');
+    : fail('すでにポイントを使っているため、参加区分は変更できません。');
 }
 
 // ─────────────────────────────────────────────────────────────

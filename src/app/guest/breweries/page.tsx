@@ -29,7 +29,7 @@ export default function GuestBreweryListPage() {
         <Title>酒蔵をさがす</Title>
         <div className="mt-2 flex items-baseline gap-2">
           <span className="font-display text-[28px] leading-none text-gold">{tickets}</span>
-          <span className="text-[12px] text-ink-55">枚 のチケットで</span>
+          <span className="text-[12px] text-ink-55">ポイントで</span>
           <span className="font-display text-[22px] leading-none text-ink">
             {affordableCount}
           </span>
@@ -116,7 +116,7 @@ function BreweryRow({
 
       {short && (
         <span className="w-fit rounded-full bg-terracotta/18 px-2.5 py-1.5 text-[11px] font-bold leading-none text-terracotta-soft">
-          あと {cheapest! - tickets} 枚 あれば頼めます
+          あと {cheapest! - tickets} ポイント あれば頼めます
         </span>
       )}
       {soldOut && brewery.items.length > 0 && (
@@ -144,7 +144,7 @@ function BreweryRow({
                 </span>
                 <span className="flex flex-none items-baseline gap-2 text-[11px] leading-none">
                   <span className={enough ? 'font-bold text-gold' : 'text-ink-45'}>
-                    {item.ticketCost} 枚
+                    {item.ticketCost} ポイント
                   </span>
                   <span className={left === 0 ? 'text-terracotta-soft' : 'text-ink-45'}>
                     {left === 0 ? '完売' : `残${left}`}

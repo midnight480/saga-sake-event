@@ -148,12 +148,12 @@ export default function BreweryStockPage() {
 
           <div className="flex flex-col gap-2 border-t border-hairline pt-3">
             <span className="text-[11.5px] leading-none text-ink-55">
-              1 杯 いただくのに、チケット何枚 使うか
+              1 杯 いただくのに、何ポイント 使うか
             </span>
             <div className="rounded-field border border-hairline-strong bg-card px-3.5 py-2">
               <Stepper
-                label="1杯あたりのチケット枚数"
-                unit="枚"
+                label="1杯あたりのポイント"
+                unit="ポイント"
                 value={ticketCost}
                 onDecrease={() => setTicketCost((v) => Math.max(1, v - 1))}
                 onIncrease={() => setTicketCost((v) => Math.min(MAX_TICKET_COST, v + 1))}
@@ -260,12 +260,12 @@ function ItemCard({ item }: { item: Item }) {
 
       <div className="flex flex-col gap-2 border-t border-hairline pt-3">
         <span className="text-[11.5px] leading-none text-ink-55">
-          1 杯 いただくのに、チケット何枚 使うか
+          1 杯 いただくのに、何ポイント 使うか
         </span>
         <div className="rounded-field border border-hairline-strong bg-card px-3.5 py-2">
           <Stepper
-            label="1杯あたりのチケット枚数"
-            unit="枚"
+            label="1杯あたりのポイント"
+            unit="ポイント"
             value={item.ticketCost}
             onDecrease={() => act(() => setTicketCost(item.id, Math.max(1, item.ticketCost - 1)))}
             onIncrease={() =>

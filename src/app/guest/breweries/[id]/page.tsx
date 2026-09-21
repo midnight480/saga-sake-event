@@ -66,7 +66,7 @@ export default function GuestBreweryDetailPage() {
             <span className="font-display text-[24px] leading-none text-gold">
               {guest.tickets}
             </span>
-            <span className="text-[12px] text-ink-55">枚 持っています</span>
+            <span className="text-[12px] text-ink-55">ポイント 持っています</span>
           </div>
         )}
       </header>
@@ -138,8 +138,8 @@ function OrderCard({
     : blocked
       ? blockedReason
       : notEnough
-        ? `あと ${need - tickets} 枚 必要です`
-        : `${need} 枚でリクエスト`;
+        ? `あと ${need - tickets} ポイント 必要です`
+        : `${need} ポイントでリクエスト`;
 
   const submit = () => {
     setError(null);
@@ -169,7 +169,7 @@ function OrderCard({
               item.ticketCost <= tickets ? 'text-gold' : 'text-terracotta-soft'
             }`}
           >
-            1 杯 チケット {item.ticketCost} 枚
+            1 杯 {item.ticketCost} ポイント
             {item.ticketCost > tickets && '（足りません）'}
           </span>
         </div>
@@ -203,7 +203,7 @@ function OrderCard({
             href="/guest/charge"
             className="text-center text-[11.5px] leading-none text-gold underline"
           >
-            チケットを追加する
+            ポイントを追加する
           </Link>
         )}
       </div>
