@@ -5,8 +5,8 @@
  * 「何が足りないか」ではなく「次にどこを押すか」を返すことを目的にしている。
  */
 
-import { hasClerk } from './auth';
-import { getSql, hasDatabase } from './db';
+import { clerkKeyNames, hasClerk } from './auth';
+import { databaseUrlKey, getSql, hasDatabase } from './db';
 import { ensureSchema } from './schema';
 
 export type CheckStatus = 'ok' | 'todo' | 'error';
@@ -63,6 +63,9 @@ function db(): Check {
       title: 'データベース（Neon）',
       status: 'ok',
       done: '接続先が設定されています。',
+      // どの名前で見つけたかを出す。Vercel の連携はプレフィックスを付けるので、
+      // 「設定したのに未設定と出る」ときの切り分けがこれだけで済む。
+      detail: `${databaseUrlKey()} を使っています。`,
     };
   }
   return {
@@ -78,17 +81,22 @@ function db(): Check {
       '最後に「Connect」を押して、このプロジェクトにつなぐ',
     ],
     link: { label: 'Vercel の画面をひらく', href: 'https://vercel.com/dashboard' },
-    detail: 'DATABASE_URL / POSTGRES_URL のいずれも設定されていません。',
+    detail:
+      'DATABASE_URL / POSTGRES_URL / STORAGE_POSTGRES_URL、' +
+      'および末尾が _DATABASE_URL・_POSTGRES_URL の変数を探しましたが、' +
+      '中身の入ったものがありませんでした。',
   };
 }
 
 function clerk(): Check {
   if (hasClerk()) {
+    const names = clerkKeyNames();
     return {
       id: 'clerk',
       title: 'ログイン（Clerk）',
       status: 'ok',
       done: '鍵が設定されています。',
+      detail: `${names.publishableKey} と ${names.secretKey} を使っています。`,
     };
   }
   return {
@@ -109,7 +117,11 @@ function clerk(): Check {
       href: 'https://vercel.com/marketplace/clerk',
     },
     detail:
-      'NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY と CLERK_SECRET_KEY の両方が必要です。',
+      'CLERK_SECRET_KEY / AUTHENTICATION_CLERK_SECRET_KEY、' +
+      'NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY / ' +
+      'NEXT_PUBLIC_AUTHENTICATION_CLERK_PUBLISHABLE_KEY、' +
+      'および末尾が _CLERK_SECRET_KEY・_CLERK_PUBLISHABLE_KEY の変数を探しましたが、' +
+      '両方はそろっていませんでした。',
   };
 }
 

@@ -128,7 +128,7 @@ function CheckCard({ check, index }: { check: Check; index: number }) {
         </a>
       )}
 
-      {check.detail && check.status !== 'ok' && (
+      {check.detail && (
         <details className="text-[11px] leading-[1.7] text-ink-45">
           <summary className="cursor-pointer">技術的な詳細（開発者向け）</summary>
           <p className="mt-2 font-mono break-all">{check.detail}</p>

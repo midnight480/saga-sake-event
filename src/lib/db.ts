@@ -9,23 +9,21 @@
 
 import { neon, neonConfig, type NeonQueryFunction } from '@neondatabase/serverless';
 
-/**
- * Vercel の Neon 連携は接続文字列を複数の名前で入れる。
- * どれが入っていても動くように順に探す。
- */
-const URL_KEYS = [
-  'DATABASE_URL',
-  'POSTGRES_URL',
-  'DATABASE_URL_UNPOOLED',
-  'POSTGRES_URL_NON_POOLING',
-] as const;
+import { originOf, resolveDatabaseUrl } from './env';
 
+/**
+ * 接続文字列を探す。名前の候補は env.ts にまとめてある
+ * （Vercel の連携は STORAGE_POSTGRES_URL のようにプレフィックスを付けるため）。
+ */
 export function databaseUrl(): string | undefined {
-  for (const key of URL_KEYS) {
-    const value = process.env[key];
-    if (value && value.trim() !== '') return value.trim();
-  }
-  return undefined;
+  return resolveDatabaseUrl()?.value;
+}
+
+/** どの名前で見つかったか。/setup の診断に出す。 */
+export function databaseUrlKey(): string | undefined {
+  const key = resolveDatabaseUrl()?.key;
+  // 正規化で写したものなら、写し元の名前を見せる。
+  return (key && originOf(key)) ?? key;
 }
 
 export function hasDatabase(): boolean {
