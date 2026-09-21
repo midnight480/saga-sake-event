@@ -64,6 +64,7 @@ export const STATEMENTS: string[] = [
      description     text        NOT NULL DEFAULT '',
      richness        text        NOT NULL DEFAULT '',
      sweetness       text        NOT NULL DEFAULT '',
+     accepting       boolean     NOT NULL DEFAULT true,
      created_at      timestamptz NOT NULL DEFAULT now(),
      CONSTRAINT items_bottles_not_negative   CHECK (bottles   >= 0),
      CONSTRAINT items_used_cups_not_negative CHECK (used_cups >= 0),
@@ -182,6 +183,14 @@ export const STATEMENTS: string[] = [
        FROM breweries WHERE id = v_item.brewery_id;
      IF NOT COALESCE(v_accepting, false) THEN
        RETURN QUERY SELECT false, 'この蔵は現在 受付を停止しています。'::text,
+                           NULL::bigint, NULL::integer;
+       RETURN;
+     END IF;
+
+     -- 銘柄ごとの受付停止（Issue #43）。最初に銘柄の行をロックして読んだ値なので、
+     -- 蔵が止めた直後に押されても、止めたあとの値で判断できる。
+     IF NOT v_item.accepting THEN
+       RETURN QUERY SELECT false, 'この銘柄はいま受付を停止しています。ほかの銘柄をお選びください。'::text,
                            NULL::bigint, NULL::integer;
        RETURN;
      END IF;
@@ -348,6 +357,9 @@ export const SEED_STATEMENTS: string[] = [
   `ALTER TABLE items DROP CONSTRAINT IF EXISTS items_sweetness_valid`,
   `ALTER TABLE items ADD CONSTRAINT items_sweetness_valid
      CHECK (sweetness IN ('', '大甘口', '甘口', '普通', '辛口', '大辛口'))`,
+
+  // 銘柄ごとの受付停止（Issue #43）を足した分の移行。既存の銘柄は受付中のまま。
+  `ALTER TABLE items ADD COLUMN IF NOT EXISTS accepting boolean NOT NULL DEFAULT true`,
 
   // 1 杯あたりのチケット枚数の上限を広げた分の移行。
   // 銘柄の値付けは蔵が決めるので、3 枚までという決め打ちをやめた。

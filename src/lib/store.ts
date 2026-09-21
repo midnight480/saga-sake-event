@@ -126,7 +126,7 @@ export async function listBreweries(): Promise<Brewery[]> {
       (b.clerk_user_id IS NOT NULL) AS has_login_account,
       i.id  AS item_id, i.name AS item_name, i.kind, i.polish, i.size,
       i.cups_per_bottle, i.bottles, i.used_cups, i.ticket_cost, i.description,
-      i.richness, i.sweetness,
+      i.richness, i.sweetness, i.accepting AS item_accepting,
       COALESCE((
         SELECT sum(r.cups) FROM requests r
         WHERE r.item_id = i.id AND r.status IN ('accepted', 'preparing', 'ready')
@@ -167,6 +167,7 @@ export async function listBreweries(): Promise<Brewery[]> {
         description: String(row.description ?? ''),
         richness: pickOne(SAKE_RICHNESS, row.richness),
         sweetness: pickOne(SAKE_SWEETNESS, row.sweetness),
+        accepting: row.item_accepting !== false,
       });
     }
   }
@@ -267,6 +268,18 @@ export async function setAccepting(breweryId: string, accepting: boolean): Promi
     UPDATE breweries SET accepting = ${accepting} WHERE id = ${breweryId} RETURNING id
   `) as { id: string }[];
   return rows.length > 0 ? ok(undefined) : fail('その酒蔵は見つかりませんでした。');
+}
+
+/**
+ * 銘柄ごとの受付を止める／再開する（Issue #43）。
+ * 止めても、すでに受けた注文はそのまま進められる（渡す・取り消す）。
+ */
+export async function setItemAccepting(itemId: string, accepting: boolean): Promise<Result> {
+  const sql = await db();
+  const rows = (await sql`
+    UPDATE items SET accepting = ${accepting} WHERE id = ${itemId} RETURNING id
+  `) as { id: string }[];
+  return rows.length > 0 ? ok(undefined) : fail('その銘柄は見つかりませんでした。');
 }
 
 export async function moveBooth(breweryId: string, direction: 1 | -1): Promise<Result> {

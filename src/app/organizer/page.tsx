@@ -167,6 +167,17 @@ function BreweryRow({ brewery, waiting }: { brewery: Brewery; waiting: number })
         </p>
       )}
 
+      {/* 銘柄ごとに止めているもの（Issue #43）。一覧を閉じていても見えるように。 */}
+      {brewery.accepting && brewery.items.some((i) => !i.accepting) && (
+        <p className="text-[12px] leading-[1.7] text-amber">
+          受付を止めている銘柄:{' '}
+          {brewery.items
+            .filter((i) => !i.accepting)
+            .map((i) => i.name)
+            .join('、')}
+        </p>
+      )}
+
       <StockBar percent={percent} />
 
       <div className="flex justify-between text-[11.5px] leading-none text-ink-55">
@@ -189,7 +200,14 @@ function BreweryRow({ brewery, waiting }: { brewery: Brewery; waiting: number })
               return (
                 <div key={item.id} className="flex flex-col gap-2">
                   <div className="flex items-baseline justify-between gap-2.5">
-                    <span className="min-w-0 font-display text-[15px] text-ink">{item.name}</span>
+                    <span className="min-w-0 font-display text-[15px] text-ink">
+                      {item.name}
+                      {!item.accepting && (
+                        <span className="ml-2 align-middle font-sans text-[11px] text-amber">
+                          受付停止中
+                        </span>
+                      )}
+                    </span>
                     <span className="flex-none text-[11.5px] leading-none whitespace-nowrap text-ink-55">
                       残り {itemLeft} / {itemTotal} 杯
                     </span>
