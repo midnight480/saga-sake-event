@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useTransition } from 'react';
 
-import { resetEvent, saveEvent, setCupsPerTicket, setPhase } from '@/app/actions';
+import { discardAllTickets, resetEvent, saveEvent, setCupsPerTicket, setPhase } from '@/app/actions';
 import {
   Button,
   Card,
@@ -333,6 +333,8 @@ function TicketPlan({ batch }: { batch: TicketBatch }) {
   const { refresh } = useSnapshot();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [done, setDone] = useState<string | null>(null);
+  const [confirming, setConfirming] = useState(false);
 
   // 発行して配ってしまうと券の値打ちが変わるので、1 枚も無いときだけ変えられる。
   const canChange = batch.issued === 0;
@@ -369,12 +371,63 @@ function TicketPlan({ batch }: { batch: TicketBatch }) {
         />
       </div>
 
+      {done && <Notice tone="info">{done}</Notice>}
+
       {!canChange && (
-        <p className="text-[11px] leading-[1.7] text-ink-45">
-          すでに {batch.issued} 枚 刷っているため変更できません。変えるには「チケットQR」の
-          画面で、刷った券をいったん取り消してください。
-        </p>
+        <div className="flex flex-col gap-2.5 border-t border-hairline pt-3">
+          <p className="text-[11.5px] leading-[1.8] text-ink-55">
+            すでに {batch.issued} 枚 刷っているため、ポイントを変えられません。
+            新しいイベントを始める場合は、前回の券をここで取り消してください。
+          </p>
+          <Button tone="flat" block onClick={() => setConfirming(true)} disabled={pending}>
+            刷った券をすべて取り消す
+          </Button>
+        </div>
       )}
+
+      <ConfirmDialog
+        open={confirming}
+        title={`${batch.label}をすべて取り消しますか`}
+        confirmLabel="はい、取り消します"
+        onConfirm={() => {
+          setConfirming(false);
+          setError(null);
+          setDone(null);
+          startTransition(async () => {
+            const result = await discardAllTickets(batch.id);
+            if (result.ok && result.value) {
+              const { removed, redeemed } = result.value;
+              setDone(
+                redeemed > 0
+                  ? `${removed} 枚 取り消しました（うち読み取り済み ${redeemed} 枚）。`
+                  : `${removed} 枚 取り消しました。`,
+              );
+            } else if (!result.ok) {
+              setError(result.reason);
+            }
+            await refresh();
+          });
+        }}
+        onCancel={() => setConfirming(false)}
+        pending={pending}
+      >
+        刷った {batch.issued} 枚をすべて消します。
+        {batch.redeemed > 0 && (
+          <>
+            <br />
+            <span className="text-terracotta-soft">
+              うち {batch.redeemed} 枚は、すでに参加者が読み取っています。
+            </span>
+          </>
+        )}
+        <br />
+        <br />
+        配った紙の券は、すべて使えなくなります。まだ配っていないか、前回の
+        イベントのものかを確かめてください。
+        <br />
+        <br />
+        すでに渡したポイントは戻りません（もう召し上がったぶんまで取り上げないためです）。
+      </ConfirmDialog>
     </Card>
   );
 }

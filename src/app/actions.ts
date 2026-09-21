@@ -627,6 +627,21 @@ export async function resetEvent(): Promise<ActionResult<store.ResetCounts>> {
   });
 }
 
+/**
+ * 読み取り済みも含めて、その券種の券をすべて消す。
+ * 次のイベントを始めるときに、1 枚あたりのポイントを変えられるようにするための操作。
+ */
+export async function discardAllTickets(
+  batchId: string,
+): Promise<ActionResult<{ removed: number; redeemed: number }>> {
+  return run(async () => {
+    await requireOrganizer();
+    const result = await store.discardAllTickets(batchId);
+    refresh();
+    return toAction(result);
+  });
+}
+
 /** 発行した券をまとめて取り消す（まだ読み取られていないものだけ）。 */
 export async function discardTickets(batchId: string): Promise<ActionResult<number>> {
   return run(async () => {

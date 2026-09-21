@@ -468,7 +468,7 @@ export async function setTicketCount(
   return ok({ issued: target, added: 0, removed: removed.length });
 }
 
-/** 発行した券をすべて取り消す。まだ 1 枚も読み取られていない場合だけ。 */
+/** まだ読み取られていない券だけを取り消す。刷りすぎたときの手当て。 */
 export async function discardTickets(batchId: string): Promise<Result<number>> {
   const sql = await db();
   const rows = (await sql`
@@ -477,6 +477,31 @@ export async function discardTickets(batchId: string): Promise<Result<number>> {
     RETURNING code
   `) as { code: string }[];
   return ok(rows.length);
+}
+
+/**
+ * 読み取り済みも含めて、その券種の券をすべて消す。
+ *
+ * 次のイベントを始めるときに使う。前回のイベントで配った券が残っていると、
+ * 1 枚あたりのポイントを変えられないため。
+ *
+ * 参加者がすでに受け取ったポイントは戻さない。戻すと、もう飲んだぶんまで
+ * 取り上げることになる。前回の参加者の残高を 0 にしたい場合は、それは
+ * 別の操作として分けている。
+ */
+export async function discardAllTickets(
+  batchId: string,
+): Promise<Result<{ removed: number; redeemed: number }>> {
+  const sql = await db();
+  const rows = (await sql`
+    DELETE FROM tickets WHERE batch_id = ${batchId}
+    RETURNING (redeemed_by IS NOT NULL) AS was_redeemed
+  `) as { was_redeemed: boolean }[];
+
+  return ok({
+    removed: rows.length,
+    redeemed: rows.filter((r) => r.was_redeemed).length,
+  });
 }
 
 export interface TicketRow {
