@@ -87,7 +87,7 @@ export async function setPhase(phase: EventPhase): Promise<ActionResult> {
  */
 export async function addBrewery(input: {
   name: string;
-  area: string;
+  area?: string;
 }): Promise<ActionResult<{ loginId: string; password: string; accountReady: boolean; warning?: string }>> {
   return run(async () => {
     await requireOrganizer();
@@ -206,10 +206,8 @@ export async function issueTickets(batchId: string, count: number): Promise<Acti
     await requireOrganizer();
 
     const batches = await store.listTicketBatches();
-    const batch = batches.find((b) => b.id === batchId);
-    if (!batch) return { ok: false, reason: 'その券種は見つかりませんでした。' };
-    if (!batch.canAdd) {
-      return { ok: false, reason: `${batch.label} は追加発行できません（事前に発行済みの券です）。` };
+    if (!batches.some((b) => b.id === batchId)) {
+      return { ok: false, reason: 'その券種は見つかりませんでした。' };
     }
 
     const result = await store.issueTickets(batchId, count);
@@ -440,6 +438,29 @@ export async function regenerateAllBreweryPasswords(): Promise<
     }
 
     return { ok: true, value: rows };
+  });
+}
+
+/**
+ * 券 1 枚で何枚分のチケットになるかを変える。
+ * 前売券と当日券で違う枚数にできる（例: 前売 12 枚、当日 10 枚）。
+ */
+export async function setCupsPerTicket(batchId: string, cups: number): Promise<ActionResult> {
+  return run(async () => {
+    await requireOrganizer();
+    const result = await store.setCupsPerTicket(batchId, cups);
+    refresh();
+    return result.ok ? { ok: true } : { ok: false, reason: result.reason };
+  });
+}
+
+/** 発行した券をまとめて取り消す（まだ読み取られていないものだけ）。 */
+export async function discardTickets(batchId: string): Promise<ActionResult<number>> {
+  return run(async () => {
+    await requireOrganizer();
+    const result = await store.discardTickets(batchId);
+    refresh();
+    return toAction(result);
   });
 }
 

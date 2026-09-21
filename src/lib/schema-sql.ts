@@ -239,7 +239,14 @@ export const SEED_STATEMENTS: string[] = [
   `INSERT INTO events (id) VALUES (1) ON CONFLICT (id) DO NOTHING`,
   `INSERT INTO ticket_batches (id, label, code, can_add, cups_per_ticket, note, sort_order)
    VALUES
-     ('advance', '前売券 10枚', 'SAGA-ADV', false, 10, '事前に発行済み・追加発行はしません', 0),
-     ('same-day', '当日券 10枚', 'SAGA-DAY', true,  10, '会場で追加発行できます',           1)
+     ('advance',  '前売券', 'SAGA-ADV', true, 10, '事前に販売する券', 0),
+     ('same-day', '当日券', 'SAGA-DAY', true, 10, '会場で販売する券', 1)
    ON CONFLICT (id) DO NOTHING`,
+
+  // 券種名から「10枚」を外す。枚数は主催者が画面で決められるようになったので、
+  // 名前に焼き込むと実際の設定と食い違う。すでに直っていれば何もしない。
+  `UPDATE ticket_batches SET label = '前売券' WHERE id = 'advance'  AND label LIKE '前売券%'  AND label <> '前売券'`,
+  `UPDATE ticket_batches SET label = '当日券' WHERE id = 'same-day' AND label LIKE '当日券%' AND label <> '当日券'`,
+  // 前売券も会場で追加発行できるようにする（初期データの名残を解消）。
+  `UPDATE ticket_batches SET can_add = true WHERE can_add = false`,
 ];

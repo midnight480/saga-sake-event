@@ -77,8 +77,7 @@ export default function BreweryCredentialsPrintPage() {
                     {row.name}
                   </h2>
                   <div className="mt-1 text-[12px] text-ink-55 print:text-black/60">
-                    {row.area}
-                    {row.booth ? ` ・ ブース ${row.booth}` : ''}
+                    {[row.booth && `ブース ${row.booth}`, row.area].filter(Boolean).join(' ・ ')}
                   </div>
 
                   <dl className="mt-4 flex flex-col gap-2 border-t border-hairline pt-4 print:border-black/20">

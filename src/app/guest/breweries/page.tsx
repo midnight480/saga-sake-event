@@ -41,8 +41,9 @@ export default function GuestBreweryListPage() {
                       {brewery.name}
                     </span>
                     <span className="text-[11.5px] leading-none text-ink-55">
-                      {brewery.area}
-                      {brewery.booth ? ` ・ ブース ${brewery.booth}` : ''}
+                      {[brewery.booth && `ブース ${brewery.booth}`, brewery.area]
+                        .filter(Boolean)
+                        .join(' ・ ') || '―'}
                     </span>
                   </div>
                   <CrowdBadge level={crowdLevel(waiting)} closed={!brewery.accepting} />

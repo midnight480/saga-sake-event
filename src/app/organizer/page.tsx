@@ -44,8 +44,8 @@ export default function OrganizerDashboard() {
   const { event, breweries, requests, batches, serverTime } = snapshot;
   const now = new Date(serverTime);
 
-  const sameDay = batches.find((b) => b.canAdd);
-  const advance = batches.find((b) => !b.canAdd);
+  const sameDay = batches.find((b) => b.id === 'same-day');
+  const advance = batches.find((b) => b.id === 'advance');
   const sameDayForSale = sameDay ? batchForSale(sameDay) : 0;
   const stockTickets = stockInTickets(breweries);
   const shortage = isTicketShortage(sameDayForSale, stockTickets);
@@ -153,8 +153,7 @@ function BreweryRow({ brewery, waiting }: { brewery: Brewery; waiting: number })
         <div className="flex min-w-0 flex-col gap-0.5">
           <span className="text-[14px] font-bold leading-snug text-ink">{brewery.name}</span>
           <span className="text-[11px] leading-none text-ink-55">
-            {brewery.area}
-            {brewery.booth ? ` ・ ${brewery.booth}` : ''}
+            {[brewery.booth, brewery.area].filter(Boolean).join(' ・ ') || '―'}
           </span>
         </div>
         <CrowdBadge level={crowdLevel(waiting)} closed={!brewery.accepting} />
