@@ -43,7 +43,7 @@ export default function GuestBreweryDetailPage() {
     );
   }
 
-  const waiting = waitingCount(snapshot.requests, brewery.id);
+  const waiting = waitingCount(snapshot.waitingByBrewery, brewery.id);
   // 受付が閉じている理由まで見て、参加者に伝える言葉を変える。
   const status = orderingStatus(snapshot.event, new Date(snapshot.serverTime));
   const guest = snapshot.guest;

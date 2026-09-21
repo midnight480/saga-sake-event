@@ -401,10 +401,15 @@ export function crowdLevel(waitingCount: number): CrowdLevel {
 }
 
 /** ある蔵の対応待ち件数。 */
-export function waitingCount(requests: OrderRequest[], breweryId: string): number {
-  return requests.filter(
-    (r) => r.breweryId === breweryId && OPEN_STATUSES.includes(r.status),
-  ).length;
+/**
+ * その蔵の待ち件数（受付済・準備中）。
+ *
+ * 数えるのはサーバー（store.countWaitingByBrewery）。以前は全員の注文を
+ * 参加者の端末へ送って画面で数えていたが、それだと誰が何を頼んだかまで
+ * 渡ってしまう（Issue #39）。画面には蔵ごとの件数だけが届く。
+ */
+export function waitingCount(waitingByBrewery: Record<string, number>, breweryId: string): number {
+  return waitingByBrewery[breweryId] ?? 0;
 }
 
 // ─────────────────────────────────────────────────────────────

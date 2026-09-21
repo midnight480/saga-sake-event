@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 
 import { getViewer } from '@/lib/auth';
 import { hasDatabase } from '@/lib/db';
-import { getSnapshot } from '@/lib/store';
+import { getSnapshot, type SnapshotScope } from '@/lib/store';
 
 /**
  * 会場のいまを 1 回で返す口。
@@ -20,12 +20,23 @@ export async function GET() {
 
   try {
     const viewer = await getViewer();
-    // 参加者の残高を混ぜて返すのは、本人がログインしているときだけ。
-    // 🔔 の未読数は役割を問わず、ログインしている本人のぶんを返す。
-    const snapshot = await getSnapshot(
-      viewer?.role === 'guest' ? viewer.userId : undefined,
-      viewer?.userId,
-    );
+
+    // ログインしていない人には何も返さない（Issue #39）。以前は誰にでも
+    // 全員の注文と蔵のログイン ID を返していた。この口を使う画面は、どれも
+    // ログインした人しか開けないので、ここで断っても困る画面は無い。
+    if (!viewer) {
+      return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+    }
+
+    // 役割ごとに中身を絞る。蔵のアカウントなのに蔵が見つからない場合は、
+    // 蔵の分として何も見せない（空の蔵 ID で絞るので注文は 0 件になる）。
+    const scope: SnapshotScope =
+      viewer.role === 'organizer'
+        ? { role: 'organizer', userId: viewer.userId }
+        : viewer.role === 'brewery'
+          ? { role: 'brewery', userId: viewer.userId, breweryId: viewer.breweryId ?? '' }
+          : { role: 'guest', userId: viewer.userId };
+    const snapshot = await getSnapshot(scope);
 
     // 節目を過ぎていればお知らせを送る。cron を使わずに済ませるため、
     // 画面が現在値を取りに来るこの機会に確かめている。送った記録は
