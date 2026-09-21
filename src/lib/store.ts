@@ -15,6 +15,12 @@ import { getSql } from './db';
 import { ensureSchema } from './schema';
 import {
   CUPS_PER_BOTTLE,
+  MAX_ITEM_DESCRIPTION,
+  SAKE_RICHNESS,
+  SAKE_SWEETNESS,
+  countChars,
+  type SakeRichness,
+  type SakeSweetness,
   type BottleSize,
   type Brewery,
   type EventPhase,
@@ -119,7 +125,8 @@ export async function listBreweries(): Promise<Brewery[]> {
       b.id, b.name, b.area, b.booth, b.accepting, b.login_id,
       (b.clerk_user_id IS NOT NULL) AS has_login_account,
       i.id  AS item_id, i.name AS item_name, i.kind, i.polish, i.size,
-      i.cups_per_bottle, i.bottles, i.used_cups, i.ticket_cost,
+      i.cups_per_bottle, i.bottles, i.used_cups, i.ticket_cost, i.description,
+      i.richness, i.sweetness,
       COALESCE((
         SELECT sum(r.cups) FROM requests r
         WHERE r.item_id = i.id AND r.status IN ('accepted', 'preparing', 'ready')
@@ -157,6 +164,9 @@ export async function listBreweries(): Promise<Brewery[]> {
         usedCups: Number(row.used_cups),
         pendingCups: Number(row.pending_cups),
         ticketCost: Number(row.ticket_cost),
+        description: String(row.description ?? ''),
+        richness: pickOne(SAKE_RICHNESS, row.richness),
+        sweetness: pickOne(SAKE_SWEETNESS, row.sweetness),
       });
     }
   }
@@ -277,7 +287,16 @@ export async function moveBooth(breweryId: string, direction: 1 | -1): Promise<R
 
 export async function addItem(
   breweryId: string,
-  input: { name: string; kind: string; polish: number; size: BottleSize; ticketCost: number },
+  input: {
+    name: string;
+    kind: string;
+    polish: number;
+    size: BottleSize;
+    ticketCost: number;
+    description?: string;
+    richness?: string;
+    sweetness?: string;
+  },
 ): Promise<Result<{ id: string }>> {
   const name = input.name.trim();
   if (!name) return fail('銘柄名を入力してください。');
@@ -285,18 +304,76 @@ export async function addItem(
   if (input.ticketCost < 1 || input.ticketCost > MAX_TICKET_COST) {
     return fail(`ポイントは 1〜${MAX_TICKET_COST} です。`);
   }
+  const profile = normalizeProfile(input);
+  if (!profile.ok) return profile;
+  const { description, richness, sweetness } = profile.value;
 
   const sql = await db();
   const id = `item_${randomInt(1e9).toString(36)}${Date.now().toString(36)}`;
   const cupsPerBottle = CUPS_PER_BOTTLE[input.size] ?? 6;
 
   await sql`
-    INSERT INTO items (id, brewery_id, name, kind, polish, size, cups_per_bottle, ticket_cost)
+    INSERT INTO items (id, brewery_id, name, kind, polish, size, cups_per_bottle, ticket_cost,
+                       description, richness, sweetness)
     VALUES (${id}, ${breweryId}, ${name}, ${input.kind},
             ${Math.max(0, Math.min(100, Math.round(input.polish)))},
-            ${input.size}, ${cupsPerBottle}, ${input.ticketCost})
+            ${input.size}, ${cupsPerBottle}, ${input.ticketCost},
+            ${description}, ${richness}, ${sweetness})
   `;
   return ok({ id });
+}
+
+/** 決まった候補の中の 1 つか、空。候補に無い値は空として扱う。 */
+function pickOne<T extends string>(choices: readonly T[], value: unknown): T | '' {
+  return choices.includes(value as T) ? (value as T) : '';
+}
+
+/**
+ * 銘柄の説明と味わいの型を整える（Issue #40）。どれも任意なので空でよい。
+ *
+ * 説明は前後の空白と、3 行以上続く空行を詰める。スマホの小さなカードで、
+ * 空白だけで場所を取らないように。長さは見た目どおりの文字数で数える。
+ * 味わいの型は候補（淡麗・濃醇 / 大甘口〜大辛口）のどれかか空。
+ */
+function normalizeProfile(input: {
+  description?: string;
+  richness?: string;
+  sweetness?: string;
+}): Result<{ description: string; richness: SakeRichness | ''; sweetness: SakeSweetness | '' }> {
+  const description = (input.description ?? '')
+    .replace(/\r\n?/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+  const length = countChars(description);
+  if (length > MAX_ITEM_DESCRIPTION) {
+    return fail(`説明は ${MAX_ITEM_DESCRIPTION} 文字までです（いま ${length} 文字）。`);
+  }
+  const richness = pickOne(SAKE_RICHNESS, input.richness ?? '');
+  if (input.richness && !richness) return fail('濃淡は「淡麗」か「濃醇」から選んでください。');
+  const sweetness = pickOne(SAKE_SWEETNESS, input.sweetness ?? '');
+  if (input.sweetness && !sweetness) return fail('甘辛は候補の中から選んでください。');
+  return ok({ description, richness, sweetness });
+}
+
+/**
+ * 登録したあとで、説明と味わいの型を書き直す。
+ * 誤字を直すために、銘柄を消して作り直させない（本数や注文が消えてしまう）。
+ */
+export async function setItemProfile(
+  itemId: string,
+  input: { description?: string; richness?: string; sweetness?: string },
+): Promise<Result> {
+  const profile = normalizeProfile(input);
+  if (!profile.ok) return profile;
+  const { description, richness, sweetness } = profile.value;
+
+  const sql = await db();
+  const rows = (await sql`
+    UPDATE items SET description = ${description}, richness = ${richness}, sweetness = ${sweetness}
+    WHERE id = ${itemId}
+    RETURNING id
+  `) as { id: string }[];
+  return rows.length > 0 ? ok(undefined) : fail('その銘柄は見つかりませんでした。');
 }
 
 /**

@@ -23,6 +23,7 @@ import {
   waitingCount,
   type Item,
 } from '@/lib/domain';
+import { TasteTags } from '@/components/TasteTags';
 import { useSnapshot } from '@/lib/useSnapshot';
 
 /** 銘柄を選ぶ。ブースの前で開く画面。 */
@@ -191,6 +192,8 @@ function OrderCard({
           <span className="text-[11.5px] leading-[1.6] text-ink-55">
             {item.kind} / 精米 {item.polish}% ・ {item.size}
           </span>
+          {/* 初めての人の手がかり（Issue #40）。蔵が選んだ・書いたものだけ出す。 */}
+          <TasteTags item={item} />
           <span
             className={`text-[11.5px] leading-none font-bold whitespace-nowrap ${
               item.ticketCost <= tickets ? 'text-gold' : 'text-terracotta-soft'
@@ -202,6 +205,12 @@ function OrderCard({
         </div>
         <LeftBadge left={left} />
       </div>
+
+      {item.description && (
+        <p className="text-[12.5px] leading-[1.8] whitespace-pre-line text-ink-70">
+          {item.description}
+        </p>
+      )}
 
       {error && <Notice tone="danger">{error}</Notice>}
 

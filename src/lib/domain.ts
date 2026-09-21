@@ -66,6 +66,29 @@ export interface Item {
   /** まだ渡し終えていない注文が押さえている杯数。 */
   pendingCups: number;
   ticketCost: number; // 1 杯あたりのチケット枚数 1-3
+  /**
+   * 蔵が添える説明（任意、Issue #40）。空なら出さない。
+   * 初めての人には銘柄名だけではどんなお酒か分からないので、蔵の言葉で補う。
+   */
+  description: string;
+  /** 濃淡（任意）。空なら出さない。 */
+  richness: SakeRichness | '';
+  /** 甘辛（任意）。空なら出さない。 */
+  sweetness: SakeSweetness | '';
+}
+
+/**
+ * 味わいの型。説明文を読まなくても、どんなお酒か一目で分かるように。
+ * 並びは画面に出す順。schema-sql.ts の CHECK と同じ値にしておくこと。
+ */
+export const SAKE_RICHNESS = ['淡麗', '濃醇'] as const;
+export const SAKE_SWEETNESS = ['大甘口', '甘口', '普通', '辛口', '大辛口'] as const;
+export type SakeRichness = (typeof SAKE_RICHNESS)[number];
+export type SakeSweetness = (typeof SAKE_SWEETNESS)[number];
+
+/** 画面に出す味わいの札。選ばれているものだけ、濃淡 → 甘辛 の順に。 */
+export function tasteTags(item: Pick<Item, 'richness' | 'sweetness'>): string[] {
+  return [item.richness, item.sweetness].filter((t): t is SakeRichness | SakeSweetness => !!t);
 }
 
 export interface Brewery {
@@ -239,6 +262,12 @@ export const MAX_TICKET_COST = 20;
  */
 export const MAX_INQUIRY_SUBJECT = 100;
 export const MAX_INQUIRY_BODY = 300;
+
+/**
+ * 銘柄の説明文の長さの上限（Issue #40）。数え方は問い合わせと同じ。
+ * スマホの銘柄カードで 4〜5 行に収まる長さ。schema-sql.ts の CHECK と同じ値。
+ */
+export const MAX_ITEM_DESCRIPTION = 200;
 
 /** 見た目どおりの文字数。 */
 export function countChars(text: string): number {

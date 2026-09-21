@@ -61,6 +61,9 @@ export const STATEMENTS: string[] = [
      bottles         integer     NOT NULL DEFAULT 0,
      used_cups       integer     NOT NULL DEFAULT 0,
      ticket_cost     integer     NOT NULL DEFAULT 1,
+     description     text        NOT NULL DEFAULT '',
+     richness        text        NOT NULL DEFAULT '',
+     sweetness       text        NOT NULL DEFAULT '',
      created_at      timestamptz NOT NULL DEFAULT now(),
      CONSTRAINT items_bottles_not_negative   CHECK (bottles   >= 0),
      CONSTRAINT items_used_cups_not_negative CHECK (used_cups >= 0),
@@ -327,6 +330,24 @@ export const SEED_STATEMENTS: string[] = [
      ('advance',  '前売券', 'SAGA-ADV', true, 10, '事前に販売する券', 0),
      ('same-day', '当日券', 'SAGA-DAY', true, 10, '会場で販売する券', 1)
    ON CONFLICT (id) DO NOTHING`,
+
+  // 銘柄の説明文（Issue #40）を足した分の移行。すでにある表に列を足す。
+  // 長さは domain.ts の MAX_ITEM_DESCRIPTION と同じ。char_length は日本語 1 文字を
+  // 1 文字と数えるので、画面の数え方（Array.from）とそろう。
+  `ALTER TABLE items ADD COLUMN IF NOT EXISTS description text NOT NULL DEFAULT ''`,
+  `ALTER TABLE items DROP CONSTRAINT IF EXISTS items_description_length`,
+  `ALTER TABLE items ADD CONSTRAINT items_description_length
+     CHECK (char_length(description) <= 200)`,
+  // 味わいの型（濃淡・甘辛）。どちらも任意なので空文字を許す。
+  // 選べる値は domain.ts の SAKE_RICHNESS / SAKE_SWEETNESS と同じ。
+  `ALTER TABLE items ADD COLUMN IF NOT EXISTS richness text NOT NULL DEFAULT ''`,
+  `ALTER TABLE items ADD COLUMN IF NOT EXISTS sweetness text NOT NULL DEFAULT ''`,
+  `ALTER TABLE items DROP CONSTRAINT IF EXISTS items_richness_valid`,
+  `ALTER TABLE items ADD CONSTRAINT items_richness_valid
+     CHECK (richness IN ('', '淡麗', '濃醇'))`,
+  `ALTER TABLE items DROP CONSTRAINT IF EXISTS items_sweetness_valid`,
+  `ALTER TABLE items ADD CONSTRAINT items_sweetness_valid
+     CHECK (sweetness IN ('', '大甘口', '甘口', '普通', '辛口', '大辛口'))`,
 
   // 1 杯あたりのチケット枚数の上限を広げた分の移行。
   // 銘柄の値付けは蔵が決めるので、3 枚までという決め打ちをやめた。
