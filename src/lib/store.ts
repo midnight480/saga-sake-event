@@ -1422,6 +1422,23 @@ export async function markNoticeRead(clerkUserId: string, role: Role, noticeId: 
   `;
 }
 
+/**
+ * 通知を閉じた・押したときに、そのお知らせを読んだことにする（Issue #80）。
+ *
+ * 呼ぶのは /api/notices/read だけで、そこで「このお知らせを、この人あてに送った」
+ * という署名を確かめてから来る（push.ts の verifyReadSignature）。署名が見える
+ * 条件の代わりになるので、ここでは役割による絞り込みをしない。ログインの状態が
+ * 分からない常駐スクリプトから呼ばれるため、役割を知る手段も無い。
+ */
+export async function markNoticeReadBySignedPush(clerkUserId: string, noticeId: number): Promise<void> {
+  const sql = await db();
+  await sql`
+    INSERT INTO notice_reads (notice_id, clerk_user_id)
+    SELECT n.id, ${clerkUserId} FROM notices n WHERE n.id = ${noticeId}
+    ON CONFLICT (notice_id, clerk_user_id) DO NOTHING
+  `;
+}
+
 /** 見えているものを全部、読んだことにする。新しく既読にした件数を返す。 */
 export async function markAllNoticesRead(clerkUserId: string, role: Role): Promise<number> {
   const sql = await db();
