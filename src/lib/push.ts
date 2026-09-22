@@ -12,6 +12,8 @@
  * 何台が同時に取りに来ても二重には送られない。
  */
 
+import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
+
 import webpush from 'web-push';
 
 import { getSql } from './db';
@@ -89,6 +91,36 @@ export interface PushTarget {
   endpoint: string;
   p256dh: string;
   auth: string;
+  /** 宛先の人。🔔 に残したお知らせを、通知を閉じたときに既読にするために使う（Issue #80）。 */
+  clerk_user_id?: string;
+}
+
+/**
+ * 通知を閉じた・押したときに、🔔 の同じお知らせを既読にするための署名（Issue #80）。
+ *
+ * 既読にするのは常駐スクリプト（sw.js）から。アプリを閉じている間に通知を閉じる
+ * こともあるので、ログインの状態（Clerk の短命なセッション）には頼れない。代わりに、
+ * 「このお知らせを、この人あてに送った」ことをサーバーが署名して通知に添え、
+ * 戻ってきた署名が合うときだけ既読にする。ほかの人のお知らせは既読にできない。
+ *
+ * 鍵は VAPID の秘密鍵から用途の名前を混ぜて作る。新しい鍵を保存する場所を
+ * 増やさずに済み、秘密鍵そのものを別の用途に使い回すこともない。
+ */
+async function readSignature(noticeId: number, clerkUserId: string): Promise<string> {
+  const { privateKey } = await vapidKeys();
+  const key = createHash('sha256').update(`notice-read:${privateKey}`).digest();
+  return createHmac('sha256', key).update(`${noticeId}.${clerkUserId}`).digest('base64url');
+}
+
+/** 通知から戻ってきた署名が正しいか。 */
+export async function verifyReadSignature(
+  noticeId: number,
+  clerkUserId: string,
+  signature: string,
+): Promise<boolean> {
+  const expected = Buffer.from(await readSignature(noticeId, clerkUserId));
+  const given = Buffer.from(signature);
+  return expected.length === given.length && timingSafeEqual(expected, given);
 }
 
 /** この端末にお知らせを送ってよい、と登録する。 */
@@ -142,6 +174,8 @@ interface NoticePayload {
   requireInteraction?: boolean;
   /** 振動のしかた（ミリ秒で、振動・休み・振動…）。Android のみ。 */
   vibrate?: number[];
+  /** 🔔 に残したお知らせの番号。閉じたときに既読にする（Issue #80）。 */
+  noticeId?: number;
 }
 
 /**
@@ -170,7 +204,22 @@ async function sendTo(
   const keys = await vapidKeys();
   webpush.setVapidDetails(contact(), keys.publicKey, keys.privateKey);
 
-  const payload = JSON.stringify(notice);
+  const { noticeId, ...rest } = notice;
+  // 🔔 に残したお知らせなら、宛先ごとに既読にするための署名を添える。
+  // 署名は人ごとに違うので、中身も宛先ごとに作る。
+  const payloadFor = async (t: PushTarget) =>
+    JSON.stringify(
+      noticeId !== undefined && t.clerk_user_id
+        ? {
+            ...rest,
+            read: {
+              id: noticeId,
+              user: t.clerk_user_id,
+              sig: await readSignature(noticeId, t.clerk_user_id),
+            },
+          }
+        : rest,
+    );
   const dead: string[] = [];
   const failed: string[] = [];
   const failures: string[] = [];
@@ -181,7 +230,7 @@ async function sendTo(
       try {
         await webpush.sendNotification(
           { endpoint: t.endpoint, keys: { p256dh: t.p256dh, auth: t.auth } },
-          payload,
+          await payloadFor(t),
         );
         sent += 1;
       } catch (error) {
@@ -241,12 +290,17 @@ export async function sendTestNotice(
 }
 
 /** 登録している全員に送る。節目のお知らせで使う。 */
-async function sendToAll(title: string, body: string, url: string): Promise<number> {
+async function sendToAll(
+  title: string,
+  body: string,
+  url: string,
+  noticeId?: number,
+): Promise<number> {
   const sql = await db();
   const targets = (await sql`
-    SELECT endpoint, p256dh, auth FROM push_subscriptions
+    SELECT endpoint, p256dh, auth, clerk_user_id FROM push_subscriptions
   `) as PushTarget[];
-  return (await sendTo(targets, { title, body, url })).sent;
+  return (await sendTo(targets, { title, body, url, noticeId })).sent;
 }
 
 /**
@@ -290,18 +344,20 @@ export async function sendReadyNotice(
 
   // 先に 🔔 の履歴へ残す。通知を許可していない人・iPhone でホーム画面に
   // 追加していない人にも、アプリの中では必ず見えるようにするため。
-  await sql`
+  const [saved] = (await sql`
     INSERT INTO notices (clerk_user_id, kind, title, body, url)
     VALUES (${request.guest_clerk_id}, 'ready', ${notice.title}, ${notice.body}, ${notice.url})
-  `;
+    RETURNING id
+  `) as { id: number | string }[];
 
   const targets = (await sql`
-    SELECT endpoint, p256dh, auth FROM push_subscriptions
+    SELECT endpoint, p256dh, auth, clerk_user_id FROM push_subscriptions
     WHERE clerk_user_id = ${request.guest_clerk_id}
   `) as PushTarget[];
 
   const { sent } = await sendTo(targets, {
     ...notice,
+    noticeId: Number(saved.id),
     // 催促は毎回別の tag にする。同じ tag だと、前の知らせを静かに置き換えるだけで
     // 鳴らない端末がある。
     tag: options.reminder ? `remind-${requestId}-${Date.now()}` : `ready-${requestId}`,
@@ -338,16 +394,19 @@ export async function sendDeliveredNotice(requestId: number): Promise<number> {
     body: `${request.brewery_name}の「${request.brand}」を記録に加えました。まだ飲んでいない銘柄は記録で見られます。`,
     url: '/guest/record',
   };
-  await sql`
+  const [saved] = (await sql`
     INSERT INTO notices (clerk_user_id, kind, title, body, url)
     VALUES (${request.guest_clerk_id}, 'delivered', ${notice.title}, ${notice.body}, ${notice.url})
-  `;
+    RETURNING id
+  `) as { id: number | string }[];
 
   const targets = (await sql`
-    SELECT endpoint, p256dh, auth FROM push_subscriptions
+    SELECT endpoint, p256dh, auth, clerk_user_id FROM push_subscriptions
     WHERE clerk_user_id = ${request.guest_clerk_id}
   `) as PushTarget[];
-  return (await sendTo(targets, { ...notice, tag: `delivered-${requestId}` })).sent;
+  return (
+    await sendTo(targets, { ...notice, tag: `delivered-${requestId}`, noticeId: Number(saved.id) })
+  ).sent;
 }
 
 /**
@@ -410,7 +469,8 @@ export async function sendMessageNotice(noticeId: number): Promise<number> {
   const roles =
     notice.audience === 'brewery+guest' ? ['brewery', 'guest'] : [notice.audience];
   const targets = (await sql`
-    SELECT endpoint, p256dh, auth FROM push_subscriptions WHERE role = ANY(${roles}::text[])
+    SELECT endpoint, p256dh, auth, clerk_user_id FROM push_subscriptions
+    WHERE role = ANY(${roles}::text[])
   `) as PushTarget[];
 
   const { sent } = await sendTo(targets, {
@@ -418,6 +478,7 @@ export async function sendMessageNotice(noticeId: number): Promise<number> {
     body: notice.body,
     url: '/',
     tag: `message-${noticeId}`,
+    noticeId,
   });
   return sent;
 }
@@ -449,13 +510,14 @@ export async function sendDueNotices(event: EventSettings, now: Date = new Date(
 
     // 🔔 の履歴にも残す。全員あてなので宛先は空（NULL）。
     // 記録を作れた 1 台だけがここに来るので、履歴も 1 件しかできない。
-    await sql`
+    const [saved] = (await sql`
       INSERT INTO notices (clerk_user_id, kind, title, body, url)
       VALUES (NULL, 'milestone', ${spec.title}, ${spec.body}, '/')
-    `;
+      RETURNING id
+    `) as { id: number | string }[];
 
     try {
-      await sendToAll(spec.title, spec.body, '/');
+      await sendToAll(spec.title, spec.body, '/', Number(saved.id));
     } catch (error) {
       console.error('[push] 送信に失敗しました', error);
     }
