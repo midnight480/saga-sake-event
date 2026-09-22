@@ -123,24 +123,33 @@ export default function GuestBreweryDetailPage() {
         {brewery.items.length === 0 ? (
           <Empty>この蔵はまだ銘柄を登録していません。</Empty>
         ) : (
-          brewery.items.map((item) => (
-            <OrderCard
-              key={item.id}
-              item={item}
-              tickets={guest?.tickets ?? 0}
-              blocked={!status.open || !brewery.accepting || !!undelivered || sending !== null}
-              blockedReason={
-                !status.open
-                  ? status.label
-                  : !brewery.accepting
-                    ? '受付停止中'
-                    : sending === 'sending'
-                      ? 'ほかのリクエストを送っています…'
-                      : '受け取り待ちです'
-              }
-              onSending={setSending}
-            />
-          ))
+          brewery.items.map((item) => {
+            // 受け取り待ちの銘柄そのものか、それ以外か（Issue #82）。以前はどちらも
+            // 「受け取り待ちです」と出ていて、頼んでいない銘柄まで頼んだように見えた。
+            const mine = undelivered?.itemId === item.id ? undelivered : null;
+            const waitingOther = (!!undelivered && !mine) || sending !== null;
+            return (
+              <OrderCard
+                key={item.id}
+                item={item}
+                tickets={guest?.tickets ?? 0}
+                blocked={!status.open || !brewery.accepting || !!undelivered || sending !== null}
+                blockedReason={
+                  !status.open
+                    ? status.label
+                    : !brewery.accepting
+                      ? '受付停止中'
+                      : mine
+                        ? `リクエスト済み（${STATUS_LABEL[mine.status]}）`
+                        : sending === 'sending'
+                          ? 'ほかのリクエストを送っています…'
+                          : '他のリクエスト対応中'
+                }
+                dimmed={status.open && brewery.accepting && waitingOther}
+                onSending={setSending}
+              />
+            );
+          })
         )}
       </div>
     </>
@@ -152,12 +161,19 @@ function OrderCard({
   tickets,
   blocked,
   blockedReason,
+  dimmed,
   onSending,
 }: {
   item: Item;
   tickets: number;
   blocked: boolean;
   blockedReason: string;
+  /**
+   * ほかのリクエストを受け取るまで頼めない銘柄（Issue #82）。1 段暗くして、
+   * 頼んだ銘柄（暗くしない）と見分けられるようにする。完売・受付停止（opacity-50）
+   * よりは明るくし、しばらく待てば頼めることを伝える。
+   */
+  dimmed: boolean;
   /** 送りはじめ（sending）・送れた（sent）・失敗して戻す（null）を画面全体に伝える。 */
   onSending: (state: 'sending' | 'sent' | null) => void;
 }) {
@@ -229,7 +245,7 @@ function OrderCard({
       id={anchor}
       className={`rounded-card transition-shadow duration-500 ${highlight ? 'ring-2 ring-gold' : ''}`}
     >
-    <Card className={soldOut || paused ? 'opacity-50' : undefined}>
+    <Card className={soldOut || paused ? 'opacity-50' : dimmed ? 'opacity-70' : undefined}>
       <div className="flex items-start justify-between gap-2.5">
         <div className="flex min-w-0 flex-col gap-1.5">
           <span className="font-display text-[20px] tracking-[0.04em] text-ink">{item.name}</span>
