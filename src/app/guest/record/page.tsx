@@ -11,7 +11,14 @@ import {
   StatusBadge,
   Title,
 } from '@/components/ui';
-import { conquestOf, formatJstDateTime, requestsOf, type BreweryConquest } from '@/lib/domain';
+import {
+  conquestOf,
+  formatJstDateTime,
+  requestsOf,
+  titleOf,
+  type BreweryConquest,
+  type TitleStatus,
+} from '@/lib/domain';
 import { useSnapshot } from '@/lib/useSnapshot';
 
 /**
@@ -42,6 +49,9 @@ export default function GuestRecordPage() {
           <Note>受け取ったお酒だけを「制覇」として数えます。</Note>
         </div>
       </ScreenHeader>
+
+      {/* ── 称号（Issue #52）── */}
+      <TitleCard status={titleOf(conquest)} />
 
       {/* ── 制覇のまとめ ── */}
       <div className="grid grid-cols-3 gap-2 px-5 pt-4">
@@ -168,6 +178,66 @@ function BreweryRow({ conquest }: { conquest: BreweryConquest }) {
           ))}
         </ul>
       )}
+    </div>
+  );
+}
+
+/**
+ * いまの称号と、次の称号までの道のり（Issue #52）。
+ *
+ * 記録を開くたびに「あと何銘柄で上がるか」が見えるよう、画面のいちばん上に置く。
+ * 自分の結果として SNS に載せてもらえるよう、これだけで何者か分かる大きさにした。
+ */
+function TitleCard({ status }: { status: TitleStatus }) {
+  const { rank, next, specials } = status;
+  return (
+    <div className="px-5 pt-4">
+      <div className="flex flex-col gap-3 rounded-card border border-gold/45 bg-linear-to-b from-gold/12 to-card p-4">
+        <span className="text-[11px] leading-none tracking-[0.2em] text-ink-55">いまの称号</span>
+        <div className="flex flex-col gap-1">
+          {rank.reading && (
+            <span className="text-[11px] leading-none tracking-[0.1em] text-ink-45">{rank.reading}</span>
+          )}
+          <span className="font-display text-[34px] leading-tight tracking-[0.08em] text-gold-bright">
+            {rank.name}
+          </span>
+          <span className="text-[12.5px] leading-[1.7] text-ink-70">{rank.description}</span>
+        </div>
+
+        {next && (
+          <p className="border-t border-hairline pt-2.5 text-[12px] leading-[1.7] text-ink-70">
+            次の称号「<strong className="font-bold text-ink">{next.rank.name}</strong>」まで、あと{' '}
+            <strong className="font-display text-[18px] text-gold">{next.remaining}</strong> 銘柄
+          </p>
+        )}
+
+        {/* 特別な称号。取れていないものも、目標として薄く見せる。 */}
+        <div className="flex flex-wrap gap-2">
+          {specials.map((title) => (
+            <div
+              key={title.id}
+              className={`flex flex-col gap-1 rounded-field border px-3 py-2 ${
+                title.earned ? 'border-gold/60 bg-gold/14' : 'border-hairline bg-ink/5'
+              }`}
+            >
+              <span
+                className={`text-[13px] leading-none font-bold ${title.earned ? 'text-gold-bright' : 'text-ink-45'}`}
+              >
+                {title.earned ? '★ ' : '☆ '}
+                {title.name}
+                <span className="sr-only">{title.earned ? '（取得済み）' : '（まだ）'}</span>
+              </span>
+              <span className="text-[11px] leading-snug text-ink-55">
+                {title.earned ? title.detail : `${title.description}（${title.detail}）`}
+              </span>
+            </div>
+          ))}
+        </div>
+
+        <p className="text-[10.5px] leading-[1.6] text-ink-45">
+          称号は受け取ったお酒の銘柄の数で上がります。お水もはさみながら、ご自分のペースでどうぞ。
+        </p>
+      </div>
     </div>
   );
 }

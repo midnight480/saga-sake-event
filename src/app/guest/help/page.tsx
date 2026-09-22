@@ -120,6 +120,12 @@ export default function GuestHelpPage() {
           これまでの注文を時刻つきで見られます。数えるのは受け取ったお酒だけです。
           蔵の行を押すと、その蔵の銘柄が開きます。
         </HelpText>
+        <HelpText>
+          いちばん上には<strong className="text-ink">称号</strong>が出ます。受け取った銘柄の数が
+          増えるほど「素面」「ほろ酔い」…と上がり、すべての蔵のすべての銘柄を飲み干すと
+          「酒呑童子」になります。ひとつの蔵の全銘柄で「蔵の主」、すべての蔵で 1 銘柄ずつで
+          「蔵めぐり名人」も取れます。
+        </HelpText>
       </HelpSection>
 
       <HelpSection title="困ったとき">
