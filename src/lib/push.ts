@@ -238,6 +238,44 @@ export async function sendReadyNotice(requestId: number): Promise<number> {
 }
 
 /**
+ * 受け取ったことを、頼んだ本人に知らせる（Issue #66）。
+ *
+ * 蔵が「受渡完了」にしたら、🔔 に残し、スマホの通知も送る。押すと記録の画面が開き、
+ * まだ飲んでいない銘柄が分かる。できあがり（sendReadyNotice）と違って急ぎでは
+ * ないので、消えずに残す指定や長めの振動は付けない。
+ *
+ * 呼ぶのは「受渡完了」に進めるのに成功したときだけ（actions.ts）。状態の更新は
+ * 「いまが準備完了なら」を条件にした 1 文なので、同じ注文で 2 回成功しない。
+ */
+export async function sendDeliveredNotice(requestId: number): Promise<number> {
+  const sql = await db();
+  const rows = (await sql`
+    SELECT r.guest_clerk_id, r.brand, b.name AS brewery_name
+    FROM requests r
+    JOIN breweries b ON b.id = r.brewery_id
+    WHERE r.id = ${requestId} AND r.status = 'delivered'
+  `) as { guest_clerk_id: string; brand: string; brewery_name: string }[];
+  const request = rows[0];
+  if (!request) return 0;
+
+  const notice = {
+    title: '受け取りました',
+    body: `${request.brewery_name}の「${request.brand}」を記録に加えました。まだ飲んでいない銘柄は記録で見られます。`,
+    url: '/guest/record',
+  };
+  await sql`
+    INSERT INTO notices (clerk_user_id, kind, title, body, url)
+    VALUES (${request.guest_clerk_id}, 'delivered', ${notice.title}, ${notice.body}, ${notice.url})
+  `;
+
+  const targets = (await sql`
+    SELECT endpoint, p256dh, auth FROM push_subscriptions
+    WHERE clerk_user_id = ${request.guest_clerk_id}
+  `) as PushTarget[];
+  return sendTo(targets, { ...notice, tag: `delivered-${requestId}` });
+}
+
+/**
  * 新しいリクエストを、その蔵の端末に知らせる（Issue #51）。
  *
  * 蔵の担当者は注いだり渡したりで手がふさがっていて、画面を見ていないことが

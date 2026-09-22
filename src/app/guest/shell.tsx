@@ -2,6 +2,7 @@
 
 import { AppShell, type LogoutOptions, type Tab } from '@/components/AppShell';
 import { ConsentModal } from '@/components/ConsentModal';
+import { DeliveredAlert } from '@/components/DeliveredAlert';
 import { ReadyAlert } from '@/components/ReadyAlert';
 import { orderingStatus } from '@/lib/domain';
 import { useSnapshot } from '@/lib/useSnapshot';
@@ -53,6 +54,8 @@ export function GuestShell({
       {children}
       {/* できあがりを音・振動・帯で知らせる（Issue #58）。 */}
       {snapshot?.guest && <ReadyAlert guestClerkId={snapshot.guest.clerkUserId} />}
+      {/* 受け取ったら記録へ案内する（Issue #66）。 */}
+      {snapshot?.guest && <DeliveredAlert guestClerkId={snapshot.guest.clerkUserId} />}
       {needsConsent && <ConsentModal />}
     </AppShell>
   );

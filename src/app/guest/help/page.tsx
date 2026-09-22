@@ -49,17 +49,17 @@ export default function GuestHelpPage() {
               一度に頼めるのは <strong className="text-ink">3 杯まで</strong>です。
             </>,
             <>
-              <strong className="text-ink">記録</strong>に移ります。これまでに飲んだお酒と称号を
-              見ながら、できあがりを待てます。
-            </>,
-            <>
-              いま待っているリクエストの進み具合は、<strong className="text-ink">マイページ</strong>
-              で分かります。
+              <strong className="text-ink">マイページ</strong>に移ります。ここで進み具合が
+              分かります。
             </>,
             <>
               「ブースで受け取ってください」と出たら、その蔵まで取りに行ってください。
               できあがると、音と振動が鳴り、画面の下に帯が出ます（🔔 にも残ります）。
-              音と振動は、マイページか記録の「できあがりの知らせ方」で切り替えられます。
+              音と振動は、マイページの「できあがりの知らせ方」で切り替えられます。
+            </>,
+            <>
+              受け取ると、<strong className="text-ink">記録</strong>の画面に移ります。
+              まだ飲んでいない銘柄が分かります（🔔 にも残ります）。
             </>,
             <>
               <strong className="text-ink">受け取ってから、次のリクエストを出せます。</strong>

@@ -265,7 +265,7 @@ sequenceDiagram
   A->>D: place_order()（PL/pgSQL）
   Note right of D: 行ロックの中で 残高・在庫・受付状態を<br/>確かめてから引き落とす。売り過ぎない
   D-->>A: ok、または断る理由（日本語）
-  A-->>P: 記録へ自動で移動
+  A-->>P: マイページへ自動で移動
   end
 
   rect rgb(245, 240, 240)
@@ -285,6 +285,8 @@ sequenceDiagram
   Q->>A: setRequestStatus(id, "delivered")
   A->>D: 状態遷移と在庫減を 1 本の SQL で
   Note right of D: 在庫が減るのは受渡のとき。<br/>キャンセルならポイントを参加者に戻す
+  A-->>P: 「受け取りました」の通知
+  P-->>G: 記録の画面へ（まだ飲んでいない銘柄が分かる）
   end
 ```
 

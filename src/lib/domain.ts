@@ -660,7 +660,7 @@ export function conquestOf(
 // お知らせの履歴（右上の 🔔）
 // ─────────────────────────────────────────────────────────────
 
-export type NoticeKind = 'milestone' | 'ready' | 'message';
+export type NoticeKind = 'milestone' | 'ready' | 'message' | 'delivered';
 
 /**
  * 主催者からの配信の宛先（Issue #54）。個別の蔵・参加者あては作らない。
@@ -861,4 +861,26 @@ export function takeNewlyReady(
   const next = new Set(known);
   arrived.forEach((r) => next.add(r.id));
   return { seen: next, arrived, initial };
+}
+
+/**
+ * 前回までに見ていない「受渡完了」の自分の注文を返す（Issue #66）。
+ *
+ * 受け取ったら記録の画面へ移し、まだ飲んでいない銘柄が分かるようにする。
+ * 画面を開いた直後（seen が null）は、これまでに受け取ったものを覚えるだけで
+ * 何も返さない。開き直すたびに記録へ飛ばされると困るため。
+ */
+export function takeNewlyDelivered(
+  seen: Set<number> | null,
+  requests: OrderRequest[],
+  guestClerkId: string,
+): { seen: Set<number>; arrived: OrderRequest[] } {
+  const delivered = requests.filter(
+    (r) => r.guestClerkId === guestClerkId && r.status === 'delivered',
+  );
+  if (seen === null) return { seen: new Set(delivered.map((r) => r.id)), arrived: [] };
+  const arrived = delivered.filter((r) => !seen.has(r.id));
+  const next = new Set(seen);
+  arrived.forEach((r) => next.add(r.id));
+  return { seen: next, arrived };
 }
