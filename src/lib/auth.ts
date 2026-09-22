@@ -68,6 +68,32 @@ export function organizerEmailAllowlist(): string[] {
  * いまログインしている人を、役割まで解決して返す。
  * ログインしていない / Clerk 未設定なら null。
  */
+/**
+ * その人のメールアドレス。10 分間は覚えておく（Issue #60）。
+ *
+ * 主催者の判定（許可リストに載っているか）にメールアドレスが要るが、取るには
+ * Clerk の API に問い合わせる必要がある。画面は 4 秒ごとに現在値を取りに来るので、
+ * そのたびに問い合わせると、1 回ごとに海外の Clerk との往復が入って遅くなる。
+ *
+ * メールアドレスはめったに変わらない。許可リスト（ORGANIZER_EMAILS）を変えるには
+ * 再デプロイが要り、そのとき覚えた内容も消えるので、判定が古いまま残ることはない。
+ * 覚えるのは、同じサーバーの中だけ（Fluid Compute は同じ入れ物を使い回す）。
+ */
+const EMAIL_TTL_MS = 10 * 60 * 1000;
+const emailCache = new Map<string, { email?: string; at: number }>();
+
+async function emailOf(userId: string): Promise<string | undefined> {
+  const hit = emailCache.get(userId);
+  if (hit && Date.now() - hit.at < EMAIL_TTL_MS) return hit.email;
+
+  const user = await currentUser();
+  const email = user?.primaryEmailAddress?.emailAddress?.toLowerCase();
+  // 覚える数に上限を付ける。来場者が数千人いても、メモリを使い続けないように。
+  if (emailCache.size > 5000) emailCache.clear();
+  emailCache.set(userId, { email, at: Date.now() });
+  return email;
+}
+
 export async function getViewer(): Promise<Viewer | null> {
   if (!hasClerk()) return null;
 
@@ -81,8 +107,7 @@ export async function getViewer(): Promise<Viewer | null> {
   const breweryId = await findBreweryForUser(userId);
   if (breweryId) return { userId, role: 'brewery', breweryId };
 
-  const user = await currentUser();
-  const email = user?.primaryEmailAddress?.emailAddress?.toLowerCase();
+  const email = await emailOf(userId);
 
   if (await resolveOrganizer(userId, email)) {
     return { userId, role: 'organizer', email };

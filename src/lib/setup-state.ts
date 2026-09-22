@@ -7,6 +7,7 @@
 
 import { clerkKeyNames, hasClerk } from './auth';
 import { databaseUrlKey, getSql, hasDatabase } from './db';
+import { resolveDatabaseUrl } from './env';
 import { ensureSchema } from './schema';
 
 export type CheckStatus = 'ok' | 'todo' | 'error';
@@ -53,7 +54,90 @@ export async function getSetupState(): Promise<SetupState> {
   if (hasDatabase()) checks.push(await schema());
   if (hasDatabase() && hasClerk()) checks.push(await organizer());
 
-  return { checks, ready: checks.every((c) => c.status === 'ok') };
+  // 地域の食い違いは、遅くなるだけで運営はできる。「準備完了」を止めない。
+  const where = region();
+  const ready = checks.every((c) => c.status === 'ok');
+  if (where) checks.push(where);
+
+  return { checks, ready };
+}
+
+/**
+ * サーバーとデータの置き場所が、同じ地域にあるか（Issue #60）。
+ *
+ * ★ 別の地域だと、画面の切り替えがはっきり遅くなる ★
+ * サーバーはデータを取るたびに置き場所と往復する。1 画面で何度も取るので、
+ * たとえばサーバーが米国東部・置き場所がシンガポールだと、1 回ごとに地球を
+ * 半周する往復が重なり、1 秒以上かかっていた（実際に起きた）。
+ *
+ * サーバーの地域は vercel.json で sin1（シンガポール）に決めている。Vercel から
+ * 作る Neon は東京・大阪を選べないので、日本からいちばん近いシンガポールに
+ * そろえる。手順書でも Neon の地域に Singapore を選ぶよう案内している。
+ *
+ * 接続先の文字列にはパスワードが入っているので、画面には地域の名前しか出さない。
+ * Vercel の外（手元の開発など）では地域が分からないので、何も出さない。
+ */
+const NEON_TO_VERCEL: Record<string, string> = {
+  'us-east-1': 'iad1',
+  'us-east-2': 'cle1',
+  'us-west-2': 'pdx1',
+  'eu-central-1': 'fra1',
+  'eu-west-2': 'lhr1',
+  'ap-southeast-1': 'sin1',
+  'ap-southeast-2': 'syd1',
+  'sa-east-1': 'gru1',
+  'ap-northeast-1': 'hnd1',
+};
+const REGION_LABEL: Record<string, string> = {
+  iad1: '米国東部（ワシントン）',
+  cle1: '米国東部（オハイオ）',
+  pdx1: '米国西部（オレゴン）',
+  fra1: 'ドイツ（フランクフルト）',
+  lhr1: 'イギリス（ロンドン）',
+  sin1: 'シンガポール',
+  syd1: 'オーストラリア（シドニー）',
+  gru1: 'ブラジル（サンパウロ）',
+  hnd1: '日本（東京）',
+  kix1: '日本（大阪）',
+};
+
+/** 接続先の文字列から、Neon の地域（例: sin1）だけを取り出す。 */
+export function databaseRegion(url: string | undefined): string | null {
+  if (!url) return null;
+  try {
+    // 例: ep-xxx-pooler.ap-southeast-1.aws.neon.tech
+    const host = new URL(url).hostname;
+    const aws = host.match(/\.([a-z]{2}-[a-z]+-\d)\.aws\.neon\.tech$/)?.[1];
+    return aws ? (NEON_TO_VERCEL[aws] ?? null) : null;
+  } catch {
+    return null;
+  }
+}
+
+function region(): Check | null {
+  const server = process.env.VERCEL_REGION?.trim();
+  const data = databaseRegion(resolveDatabaseUrl()?.value);
+  if (!server || !data) return null;
+
+  const label = (code: string) => REGION_LABEL[code] ?? code;
+  if (server === data) {
+    return {
+      id: 'region',
+      title: 'サーバーとデータの置き場所',
+      status: 'ok',
+      done: `同じ地域（${label(server)}）にあります。`,
+    };
+  }
+  return {
+    id: 'region',
+    title: 'サーバーとデータの置き場所',
+    status: 'todo',
+    steps: [
+      `いまはサーバーが${label(server)}、データの置き場所が${label(data)}にあり、画面の切り替えが遅くなります（運営はできます）`,
+      'まだ開催前でデータが無ければ、Neon を作り直すのがいちばん簡単です。Vercel の Storage で今の Neon を外して消し、新しく作るときに地域（Region）で「Singapore」を選んでください',
+      '作り直せない場合は、開発を手伝っている人に「vercel.json の regions を、データの置き場所の地域に合わせてほしい」と伝えてください',
+    ],
+  };
 }
 
 function db(): Check {
