@@ -4,15 +4,24 @@ import { useSearchParams } from 'next/navigation';
 import { Suspense, useCallback, useEffect, useRef, useState, useTransition } from 'react';
 
 import { redeemTicket } from '@/app/actions';
+import { Celebration } from '@/components/Celebration';
 import {
   Button,
   Card,
   Empty,
-  Notice,
   ScreenHeader,
   Title,
   inputClass,
 } from '@/components/ui';
+import { useAlertPrefs } from '@/lib/breweryAlert';
+import {
+  VIBRATE_ERROR,
+  VIBRATE_SUCCESS,
+  playError,
+  playSuccess,
+  unlockSound,
+  vibrate,
+} from '@/lib/sound';
 import { useSnapshot } from '@/lib/useSnapshot';
 
 /** 読み取り履歴（この端末で今回開いている間だけ覚える）。 */
@@ -39,6 +48,29 @@ function Charge() {
   const [success, setSuccess] = useState<string | null>(null);
   const [manualCode, setManualCode] = useState('');
   const [pending, startTransition] = useTransition();
+
+  // 成功・失敗の手ごたえ（Issue #57）。読み取れたのか分からない、を無くす。
+  // 成功: 明るい音・短い振動・左右からの紙ふぶき・大きな「＋N ポイント」
+  // 失敗: 低い音・小刻みな振動・画面の揺れ・赤い理由
+  const prefs = useAlertPrefs('guest');
+  const [burst, setBurst] = useState(0);
+  const [shaking, setShaking] = useState(false);
+  const [lastAdded, setLastAdded] = useState<number | null>(null);
+
+  // 揺れは毎回かけ直す。続けて失敗しても 2 回目がちゃんと揺れるように。
+  useEffect(() => {
+    if (!shaking) return;
+    const timer = setTimeout(() => setShaking(false), 520);
+    return () => clearTimeout(timer);
+  }, [shaking]);
+
+  // 券の QR を端末のカメラで読んで開いたときは、まだ画面に触れていないので
+  // ブラウザの決まりで音が鳴らない。どこか一度触れたら鳴る状態にしておく。
+  useEffect(() => {
+    const unlock = () => void unlockSound();
+    window.addEventListener('pointerdown', unlock, { once: true });
+    return () => window.removeEventListener('pointerdown', unlock);
+  }, []);
 
   // 同じコードを連続で送らないための記録。カメラは 1 秒に何度も同じ QR を読む。
   const submitted = useRef<Set<string>>(new Set());
@@ -69,7 +101,11 @@ function Charge() {
       startTransition(async () => {
         const result = await redeemTicket(normalized);
         if (result.ok && result.value) {
-          setSuccess(`${result.value.label} を読み取りました。＋${result.value.added} ポイント`);
+          if (prefs.sound) playSuccess();
+          if (prefs.vibrate) vibrate(VIBRATE_SUCCESS);
+          setBurst((n) => n + 1);
+          setLastAdded(result.value.added);
+          setSuccess(`${result.value.label} を読み取りました。`);
           setLog((prev) => [
             {
               time: new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' }),
@@ -80,6 +116,11 @@ function Charge() {
           ]);
           setManualCode('');
         } else if (!result.ok) {
+          if (prefs.sound) playError();
+          if (prefs.vibrate) vibrate(VIBRATE_ERROR);
+          setShaking(false);
+          requestAnimationFrame(() => setShaking(true));
+          setLastAdded(null);
           setError(result.reason);
           // 失敗したコードは、直してもう一度試せるように記録から外す。
           submitted.current.delete(normalized);
@@ -87,7 +128,7 @@ function Charge() {
         await refresh();
       });
     },
-    [pending, refresh],
+    [pending, refresh, prefs.sound, prefs.vibrate],
   );
 
   // 端末標準のカメラアプリで QR を読むと、この URL に ?code= 付きで来る。
@@ -100,6 +141,12 @@ function Charge() {
 
   return (
     <>
+      {/*
+        紙ふぶきは揺れる箱の外に置く。transform がかかった箱の中では、画面に固定した
+        要素の位置の基準が画面ではなく箱になり、失敗の直後に成功するとずれて飛ぶ。
+      */}
+      <Celebration burst={burst} />
+      <div className={shaking ? 'shake' : undefined}>
       <ScreenHeader>
         <Title>ポイントを追加</Title>
         <p className="mt-2 text-[12px] leading-[1.7] text-ink-55">
@@ -115,8 +162,31 @@ function Charge() {
       </ScreenHeader>
 
       <div className="flex flex-col gap-4 px-5 py-4">
-        {success && <Notice tone="info">{success}</Notice>}
-        {error && <Notice tone="danger">{error}</Notice>}
+        {success && (
+          <div
+            role="status"
+            className="rise-in flex flex-col items-center gap-1 rounded-card border-2 border-matcha/60 bg-matcha/12 px-4 py-4 text-center"
+          >
+            {lastAdded !== null && (
+              <span className="font-display text-[40px] leading-none text-matcha">
+                ＋{lastAdded}
+                <span className="ml-1 text-[16px]">ポイント</span>
+              </span>
+            )}
+            <span className="text-[13px] leading-[1.7] text-ink/85">{success}</span>
+          </div>
+        )}
+        {error && (
+          <div
+            role="alert"
+            className="flex flex-col gap-1 rounded-card border-2 border-terracotta/70 bg-terracotta/14 px-4 py-3.5"
+          >
+            <span className="text-[14px] font-bold leading-none text-terracotta-soft">
+              読み取れませんでした
+            </span>
+            <span className="text-[13px] leading-[1.7] text-ink/85">{error}</span>
+          </div>
+        )}
 
         <Card>
           <label className="flex flex-col gap-2">
@@ -137,7 +207,11 @@ function Charge() {
           <Button
             tone="go"
             block
-            onClick={() => submit(manualCode)}
+            onClick={() => {
+              // ボタンを押したこの瞬間に、音を鳴らせる状態にする。
+              void unlockSound();
+              submit(manualCode);
+            }}
             disabled={pending || !manualCode.trim()}
           >
             {pending ? '確認しています…' : 'ポイントを受け取る'}
@@ -176,6 +250,7 @@ function Charge() {
           </p>
         </div>
       </div>
+      </div>
     </>
   );
 }
@@ -202,6 +277,9 @@ function Scanner({ onDetect, disabled }: { onDetect: (code: string) => void; dis
   useEffect(() => () => stopRef.current?.(), []);
 
   const start = async () => {
+    // 「カメラで読み取る」を押したこの瞬間に、音を鳴らせる状態にする（Issue #57）。
+    // 読み取れたときの音は、あとからカメラが見つけた時点で鳴るので、ここで開けておく。
+    void unlockSound();
     setState('starting');
     try {
       const { BrowserQRCodeReader } = await import('@zxing/browser');

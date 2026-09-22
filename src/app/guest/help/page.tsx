@@ -29,6 +29,7 @@ export default function GuestHelpPage() {
         />
         <HelpNote>
           コードは 1 枚につき一度だけ使えます。読み取ったあとの券は、記念にお持ち帰りください。
+          読み取れると明るい音と紙ふぶき、読み取れないと低い音が鳴って画面が揺れます。
         </HelpNote>
       </HelpSection>
 
