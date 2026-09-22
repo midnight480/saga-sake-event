@@ -285,6 +285,8 @@ sequenceDiagram
   Q->>A: setRequestStatus(id, "delivered")
   A->>D: 状態遷移と在庫減を 1 本の SQL で
   Note right of D: 在庫が減るのは受渡のとき。<br/>キャンセルならポイントを参加者に戻す
+  A-->>P: 「受け取りました」の通知
+  P-->>G: 記録の画面へ（まだ飲んでいない銘柄が分かる）
   end
 ```
 

@@ -58,6 +58,10 @@ export default function GuestHelpPage() {
               音と振動は、マイページの「できあがりの知らせ方」で切り替えられます。
             </>,
             <>
+              受け取ると、<strong className="text-ink">記録</strong>の画面に移ります。
+              まだ飲んでいない銘柄が分かります（🔔 にも残ります）。
+            </>,
+            <>
               <strong className="text-ink">受け取ってから、次のリクエストを出せます。</strong>
               受け取る前は、ほかの蔵のお酒も頼めません。
             </>,

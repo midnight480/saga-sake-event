@@ -373,6 +373,18 @@ export async function setRequestStatus(
       });
     }
 
+    // 受け取ったことも本人に知らせる（Issue #66）。押すと記録の画面が開く。
+    if (result.ok && to === 'delivered') {
+      after(async () => {
+        try {
+          const { sendDeliveredNotice } = await import('@/lib/push');
+          await sendDeliveredNotice(requestId);
+        } catch (error) {
+          console.error('[push] 受渡完了の通知に失敗しました', error);
+        }
+      });
+    }
+
     return result.ok ? { ok: true } : { ok: false, reason: result.reason };
   });
 }
