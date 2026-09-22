@@ -1,7 +1,7 @@
 'use client';
 
 import { AppShell, type LogoutOptions, type Tab } from '@/components/AppShell';
-import { orderingStatus } from '@/lib/domain';
+import { eventPeriod } from '@/lib/domain';
 import { useSnapshot } from '@/lib/useSnapshot';
 
 /** 主催者がログアウトしても、イベントのデータには何も起きない。 */
@@ -41,9 +41,7 @@ export function OrganizerShell({ children }: { children: React.ReactNode }) {
     <AppShell
       role="主催者"
       roleEn="ORGANIZER"
-      status={
-        snapshot ? orderingStatus(snapshot.event, new Date(snapshot.serverTime)) : undefined
-      }
+      period={snapshot ? eventPeriod(snapshot.event, new Date(snapshot.serverTime)) : undefined}
       tabs={tabs}
       stale={isStale}
       logout={LOGOUT}

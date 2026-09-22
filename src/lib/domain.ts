@@ -543,6 +543,30 @@ export function orderingStatus(event: EventSettings, now: Date = new Date()): Or
   return { open: true, manual: false, label: '受付中' };
 }
 
+/** イベントの予定の上で、いまがどこか。 */
+export type EventPeriod = 'before' | 'during' | 'after';
+
+export const EVENT_PERIOD_LABEL: Record<EventPeriod, string> = {
+  before: 'イベント開始前',
+  during: 'イベント実施中',
+  after: 'イベント終了',
+};
+
+/**
+ * 開催日と時刻だけから、イベントの前・最中・後を決める（Issue #84）。
+ *
+ * 右上の表示に使う。以前はここに受付の状態（orderingStatus）の「受付中」「終了」を
+ * 出していたが、「受付中」が何の受付か分からず、券の受付やブースの受付と取り違えた。
+ * 主催者が手で止めたかどうかは入れない。それは受付の状態で、リクエストの画面と
+ * 主催者のイベント設定に出す。
+ */
+export function eventPeriod(event: EventSettings, now: Date = new Date()): EventPeriod {
+  const { start, end } = scheduleWindow(event);
+  if (now.getTime() < start.getTime()) return 'before';
+  if (now.getTime() >= end.getTime()) return 'after';
+  return 'during';
+}
+
 /** 'HH:MM' を 0 時からの分数へ。壊れた入力は 0 として扱う。 */
 export function timeToMinutes(hhmm: string): number {
   const [h, m] = String(hhmm).split(':');
