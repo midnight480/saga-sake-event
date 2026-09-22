@@ -265,7 +265,7 @@ sequenceDiagram
   A->>D: place_order()（PL/pgSQL）
   Note right of D: 行ロックの中で 残高・在庫・受付状態を<br/>確かめてから引き落とす。売り過ぎない
   D-->>A: ok、または断る理由（日本語）
-  A-->>P: 記録へ自動で移動
+  A-->>P: マイページへ自動で移動
   end
 
   rect rgb(245, 240, 240)
