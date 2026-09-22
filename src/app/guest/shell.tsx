@@ -1,6 +1,7 @@
 'use client';
 
 import { AppShell, type LogoutOptions, type Tab } from '@/components/AppShell';
+import { ReadyAlert } from '@/components/ReadyAlert';
 import { orderingStatus } from '@/lib/domain';
 import { useSnapshot } from '@/lib/useSnapshot';
 
@@ -42,6 +43,8 @@ export function GuestShell({ children }: { children: React.ReactNode }) {
       logout={LOGOUT}
     >
       {children}
+      {/* できあがりを音・振動・帯で知らせる（Issue #58）。 */}
+      {snapshot?.guest && <ReadyAlert guestClerkId={snapshot.guest.clerkUserId} />}
     </AppShell>
   );
 }

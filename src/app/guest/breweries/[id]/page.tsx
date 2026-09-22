@@ -24,6 +24,7 @@ import {
   type Item,
 } from '@/lib/domain';
 import { TasteTags } from '@/components/TasteTags';
+import { unlockSound } from '@/lib/sound';
 import { useSnapshot } from '@/lib/useSnapshot';
 
 /** 銘柄を選ぶ。ブースの前で開く画面。 */
@@ -175,6 +176,9 @@ function OrderCard({
 
   const submit = () => {
     setError(null);
+    // この押した瞬間に、音を鳴らせる状態にしておく（Issue #58）。できあがりの知らせは
+    // このあとで届くので、ここで開けておけば最初のできあがりから鳴る。
+    void unlockSound();
     startTransition(async () => {
       const result = await order(item.id, cups);
       if (!result.ok) {

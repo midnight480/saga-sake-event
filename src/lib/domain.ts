@@ -836,3 +836,29 @@ export function titleOf(conquest: Conquest): TitleStatus {
 
   return { rank, next, specials };
 }
+
+// ─────────────────────────────────────────────────────────────
+// 参加者に知らせる「できあがり」（Issue #58）
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * 前回までに知らせていない「準備完了」の自分の注文を返し、知らせたものとして覚える。
+ *
+ * seen が null（画面を開いた直後）のときも、すでにできあがっているものを返す。
+ * 開いた時点で取りに行くべきものがあるなら、それは知らせたほうがよいため。
+ * その場合は initial を true にして、音や振動は鳴らさない（開いただけで鳴ると驚く。
+ * そもそもブラウザの決まりで、触れる前は音が鳴らない）。
+ */
+export function takeNewlyReady(
+  seen: Set<number> | null,
+  requests: OrderRequest[],
+  guestClerkId: string,
+): { seen: Set<number>; arrived: OrderRequest[]; initial: boolean } {
+  const ready = requests.filter((r) => r.guestClerkId === guestClerkId && r.status === 'ready');
+  const initial = seen === null;
+  const known = seen ?? new Set<number>();
+  const arrived = ready.filter((r) => !known.has(r.id));
+  const next = new Set(known);
+  arrived.forEach((r) => next.add(r.id));
+  return { seen: next, arrived, initial };
+}
