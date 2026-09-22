@@ -267,6 +267,35 @@ export async function sendNewRequestNotice(requestId: number): Promise<number> {
 }
 
 /**
+ * 主催者からの配信を、宛先の役割の端末に送る（Issue #54）。
+ *
+ * 🔔 の履歴は配信した時点でできている（store.broadcastMessage）。ここでは
+ * スマホの通知だけを送る。宛先の役割は、通知を受け取る設定をしたときの役割
+ * （push_subscriptions.role）で絞る。
+ */
+export async function sendMessageNotice(noticeId: number): Promise<number> {
+  const sql = await db();
+  const rows = (await sql`
+    SELECT title, body, audience FROM notices WHERE id = ${noticeId} AND kind = 'message'
+  `) as { title: string; body: string; audience: string }[];
+  const notice = rows[0];
+  if (!notice) return 0;
+
+  const roles =
+    notice.audience === 'brewery+guest' ? ['brewery', 'guest'] : [notice.audience];
+  const targets = (await sql`
+    SELECT endpoint, p256dh, auth FROM push_subscriptions WHERE role = ANY(${roles}::text[])
+  `) as PushTarget[];
+
+  return sendTo(targets, {
+    title: `主催者より：${notice.title}`,
+    body: notice.body,
+    url: '/',
+    tag: `message-${noticeId}`,
+  });
+}
+
+/**
  * 節目を過ぎていれば送る。画面が現在値を取りに来るたびに呼ばれる。
  *
  * 送った記録を先に作り、作れたときだけ送る。開催日と節目の組を主キーに

@@ -17,7 +17,10 @@ import { AuthError, requireBrewery, requireOrganizer, requireViewer, syncRoleMet
 import {
   type BottleSize,
   type Inquiry,
+  type MessageAudience,
+  type MessageRecipients,
   type Notice,
+  type SentMessage,
   type EventPhase,
   type GuestKind,
   type RequestStatus,
@@ -538,14 +541,14 @@ export async function sendInquiry(input: {
 export async function fetchNotices(): Promise<ActionResult<Notice[]>> {
   return run(async () => {
     const viewer = await requireViewer();
-    return { ok: true, value: await store.listNotices(viewer.userId) };
+    return { ok: true, value: await store.listNotices(viewer.userId, viewer.role) };
   });
 }
 
 export async function markNoticeRead(noticeId: number): Promise<ActionResult> {
   return run(async () => {
     const viewer = await requireViewer();
-    await store.markNoticeRead(viewer.userId, noticeId);
+    await store.markNoticeRead(viewer.userId, viewer.role, noticeId);
     return { ok: true };
   });
 }
@@ -553,7 +556,53 @@ export async function markNoticeRead(noticeId: number): Promise<ActionResult> {
 export async function markAllNoticesRead(): Promise<ActionResult<number>> {
   return run(async () => {
     const viewer = await requireViewer();
-    return { ok: true, value: await store.markAllNoticesRead(viewer.userId) };
+    return { ok: true, value: await store.markAllNoticesRead(viewer.userId, viewer.role) };
+  });
+}
+
+// ═════════════════════════════════════════════════════════════
+// 主催者からの配信（Issue #54）。全酒蔵・全参加者・その両方にだけ。
+// ═════════════════════════════════════════════════════════════
+
+export async function sendBroadcast(input: {
+  audience: string;
+  title: string;
+  body: string;
+}): Promise<ActionResult> {
+  return run(async () => {
+    await requireOrganizer();
+    const result = await store.broadcastMessage(input);
+    if (!result.ok) return { ok: false, reason: result.reason };
+
+    // スマホの通知は応答のあとに送る。宛先が多くても、主催者の画面を待たせない。
+    const noticeId = result.value.id;
+    after(async () => {
+      try {
+        const { sendMessageNotice } = await import('@/lib/push');
+        await sendMessageNotice(noticeId);
+      } catch (error) {
+        console.error('[push] 配信の通知に失敗しました', error);
+      }
+    });
+
+    refresh();
+    return { ok: true };
+  });
+}
+
+export async function fetchSentMessages(): Promise<ActionResult<SentMessage[]>> {
+  return run(async () => {
+    await requireOrganizer();
+    return { ok: true, value: await store.listSentMessages() };
+  });
+}
+
+export async function fetchMessageRecipients(): Promise<
+  ActionResult<Record<MessageAudience, MessageRecipients>>
+> {
+  return run(async () => {
+    await requireOrganizer();
+    return { ok: true, value: await store.countMessageRecipients() };
   });
 }
 

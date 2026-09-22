@@ -126,7 +126,7 @@ function NoticePanel({ onClose, onChanged }: { onClose: () => void; onChanged: (
             <Empty>
               まだお知らせはありません。
               <br />
-              開始の前後や、注文したお酒ができあがったときに、ここに届きます。
+              開始の前後や主催者からのお知らせ、注文したお酒ができあがったときに、ここに届きます。
             </Empty>
           )}
 
@@ -156,6 +156,12 @@ function NoticePanel({ onClose, onChanged }: { onClose: () => void; onChanged: (
                           }`}
                         >
                           <span className="sr-only">{notice.read ? '既読 ' : '未読 '}</span>
+                          {/* 主催者からの配信（Issue #54）は、ほかの知らせと見分けられるように。 */}
+                          {notice.kind === 'message' && (
+                            <span className="mr-1.5 rounded-sm bg-gold/18 px-1.5 py-0.5 align-middle text-[10px] font-bold text-gold">
+                              主催者より
+                            </span>
+                          )}
                           {notice.title}
                         </span>
                         <span className="flex-none font-mono text-[11px] leading-none text-ink-45">

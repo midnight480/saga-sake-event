@@ -312,8 +312,9 @@ export const STATEMENTS: string[] = [
      title         text        NOT NULL,
      body          text        NOT NULL,
      url           text        NOT NULL DEFAULT '/',
+     audience      text        NOT NULL DEFAULT 'all',
      created_at    timestamptz NOT NULL DEFAULT now(),
-     CONSTRAINT notices_kind_valid CHECK (kind IN ('milestone', 'ready'))
+     CONSTRAINT notices_kind_valid CHECK (kind IN ('milestone', 'ready', 'message'))
    )`,
   `CREATE INDEX IF NOT EXISTS notices_user_idx ON notices (clerk_user_id, created_at DESC)`,
   // 読んだ記録。1 人 1 件に 1 行。全員あてのお知らせも、読んだかどうかは人ごとに違う。
@@ -339,6 +340,20 @@ export const SEED_STATEMENTS: string[] = [
      ('advance',  '前売券', 'SAGA-ADV', true, 10, '事前に販売する券', 0),
      ('same-day', '当日券', 'SAGA-DAY', true, 10, '会場で販売する券', 1)
    ON CONFLICT (id) DO NOTHING`,
+
+  // 主催者からの配信（Issue #54）を足した分の移行。
+  // audience は、宛先が空（全員あて）のお知らせを「誰に見せるか」。
+  //   all: 主催者も含む全員（節目のお知らせ）
+  //   brewery / guest: 全酒蔵 / 全参加者
+  //   brewery+guest: 酒蔵と参加者の両方（送った主催者には出さない）
+  // 既存のお知らせ（節目・準備完了）は all のまま。
+  `ALTER TABLE notices ADD COLUMN IF NOT EXISTS audience text NOT NULL DEFAULT 'all'`,
+  `ALTER TABLE notices DROP CONSTRAINT IF EXISTS notices_audience_valid`,
+  `ALTER TABLE notices ADD CONSTRAINT notices_audience_valid
+     CHECK (audience IN ('all', 'brewery', 'guest', 'brewery+guest'))`,
+  `ALTER TABLE notices DROP CONSTRAINT IF EXISTS notices_kind_valid`,
+  `ALTER TABLE notices ADD CONSTRAINT notices_kind_valid
+     CHECK (kind IN ('milestone', 'ready', 'message'))`,
 
   // 銘柄の説明文（Issue #40）を足した分の移行。すでにある表に列を足す。
   // 長さは domain.ts の MAX_ITEM_DESCRIPTION と同じ。char_length は日本語 1 文字を

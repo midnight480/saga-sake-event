@@ -91,6 +91,18 @@ export default function OrganizerHelpPage() {
         />
       </HelpSection>
 
+      <HelpSection title="全員にお知らせを送る">
+        <HelpText>
+          <strong className="text-ink">「連絡」</strong>のタブで、全酒蔵・全参加者・その両方に
+          お知らせを送れます。乾杯の案内や、閉場前の呼びかけなどに使ってください。
+        </HelpText>
+        <HelpText>
+          送ったお知らせは、宛先の人の右上の 🔔 に残ります。通知を受け取る設定の端末には、
+          スマホの通知も届きます。送る前に、何蔵・何人に届くかが出ます。
+        </HelpText>
+        <HelpNote>送ったあとは取り消せません。宛先と文面を確かめてから送ってください。</HelpNote>
+      </HelpSection>
+
       <HelpSection title="困ったとき">
         <HelpTroubles
           rows={[

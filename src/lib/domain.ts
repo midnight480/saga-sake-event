@@ -660,7 +660,39 @@ export function conquestOf(
 // お知らせの履歴（右上の 🔔）
 // ─────────────────────────────────────────────────────────────
 
-export type NoticeKind = 'milestone' | 'ready';
+export type NoticeKind = 'milestone' | 'ready' | 'message';
+
+/**
+ * 主催者からの配信の宛先（Issue #54）。個別の蔵・参加者あては作らない。
+ * 並びは画面に出す順。
+ */
+export const MESSAGE_AUDIENCES = [
+  { value: 'brewery', label: '全酒蔵' },
+  { value: 'guest', label: '全参加者' },
+  { value: 'brewery+guest', label: '酒蔵と参加者の両方' },
+] as const;
+export type MessageAudience = (typeof MESSAGE_AUDIENCES)[number]['value'];
+
+/** 配信の件名と本文の長さの上限。数え方は問い合わせと同じ（countChars）。 */
+export const MAX_MESSAGE_TITLE = 40;
+export const MAX_MESSAGE_BODY = 300;
+
+/** 主催者が送ったお知らせ。配信画面の「送ったもの」に並べる。 */
+export interface SentMessage {
+  id: number;
+  audience: MessageAudience;
+  title: string;
+  body: string;
+  createdAt: string; // ISO
+}
+
+/** 配信の確認画面に出す、届く相手の数。 */
+export interface MessageRecipients {
+  breweries: number;
+  guests: number;
+  /** そのうち、スマホの通知を受け取る端末の数。 */
+  devices: number;
+}
 
 /** 🔔 に並ぶ 1 件。 */
 export interface Notice {
