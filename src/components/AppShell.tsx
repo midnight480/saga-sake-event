@@ -2,12 +2,13 @@
 
 import { useClerk } from '@clerk/nextjs';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { useState, type ReactNode } from 'react';
+import { usePathname, useRouter } from 'next/navigation';
+import { useState, useTransition, type ReactNode } from 'react';
 
 import { NoticeBell } from '@/components/NoticeBell';
 import { ConfirmDialog } from '@/components/ui';
 import type { OrderingStatus } from '@/lib/domain';
+import { useSnapshot } from '@/lib/useSnapshot';
 
 export interface Tab {
   href: string;
@@ -64,20 +65,24 @@ export function AppShell({
         */}
         <div className="sticky top-0 z-30 bg-surface">
           <header className="flex items-center justify-between gap-3 border-b border-hairline px-5 pt-[max(1rem,env(safe-area-inset-top))] pb-3">
-            <div className="flex min-w-0 items-baseline gap-2">
-              <span className="font-display text-[17px] tracking-[0.08em] text-ink">{role}</span>
-              {/*
-                蔵名や参加者番号があるときは、英字の役割名（BREWERY など）を省く。
-                右上に 🔔 を置いたぶん幅が減り、両方を並べると iPhone 15 Pro でも
-                蔵名が「…」で切れた。どの蔵の画面かを確かめる表示なので、飾りの
-                英字より蔵名を残す。主催者は蔵名が無いので、英字がそのまま出る。
-              */}
-              <span className="truncate text-[10px] tracking-[0.12em] text-ink-45">
+            {/*
+              蔵名や参加者番号は、役割名の下の 2 行目に置く。右上に 🔔 と更新ボタンを
+              置いたぶん幅が減り、横に並べると iPhone 15 Pro でも蔵名が「…」で切れた。
+              2 行目なら、幅 375px 以上ではどの組み合わせでも全部見える（Issue #49）。
+              どの蔵の画面かを確かめる表示なので、蔵名を優先する。
+            */}
+            <div className="flex min-w-0 flex-col gap-1">
+              <span className="font-display text-[17px] leading-none tracking-[0.08em] text-ink">
+                {role}
+              </span>
+              <span className="truncate text-[11px] leading-none tracking-[0.06em] text-ink-45">
                 {subject ?? roleEn}
               </span>
             </div>
-            <div className="flex flex-none items-center gap-1.5">
+            <div className="flex flex-none items-center gap-1">
               {status && <StatusChip status={status} />}
+              {/* 画面の更新。🔔 の左に置く（Issue #49）。 */}
+              <RefreshButton />
               {/* お知らせの履歴。右上に置き、未読の数を出す。 */}
               <NoticeBell />
             </div>
@@ -132,6 +137,42 @@ export function AppShell({
         <main className="flex-1 pb-[max(1rem,env(safe-area-inset-bottom))]">{children}</main>
       </div>
     </div>
+  );
+}
+
+/**
+ * 画面の更新（Issue #49）。
+ *
+ * 数字は 4 秒ごとに自動で新しくなるが、電波の悪い会場では「いま最新なのか」が
+ * 分からず不安になる。押せばその場で取り直し、画面の組み立てもやり直す。
+ * ブラウザの再読み込みと違って、入力途中の内容やスクロール位置は消えない。
+ * 取り直している間は矢印を回し、押したことが分かるようにする。
+ */
+function RefreshButton() {
+  const router = useRouter();
+  const { refresh } = useSnapshot();
+  const [pending, startTransition] = useTransition();
+
+  const run = () => {
+    startTransition(async () => {
+      // 速い回線では一瞬で終わり、押したのか分からない。最低でも半秒は回す。
+      await Promise.all([refresh(), new Promise((r) => setTimeout(r, 500))]);
+      router.refresh();
+    });
+  };
+
+  return (
+    <button
+      type="button"
+      onClick={run}
+      disabled={pending}
+      aria-label={pending ? '更新しています' : '画面を更新'}
+      className="flex size-11 flex-none items-center justify-center rounded-full text-[20px] leading-none text-ink-70 hover:bg-ink/7 hover:text-ink disabled:opacity-70"
+    >
+      <span aria-hidden className={pending ? 'inline-block animate-spin' : 'inline-block'}>
+        ↻
+      </span>
+    </button>
   );
 }
 
