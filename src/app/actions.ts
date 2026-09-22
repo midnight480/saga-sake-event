@@ -751,14 +751,24 @@ export async function sendTestPush(input: {
     const viewer = await requireViewer();
     const { saveSubscription, sendTestNotice } = await import('@/lib/push');
     await saveSubscription({ ...input, clerkUserId: viewer.userId, role: viewer.role });
-    const sent = await sendTestNotice(viewer.userId, input.endpoint);
-    return sent > 0
-      ? { ok: true }
-      : {
-          ok: false,
-          reason:
-            '送れませんでした。「受け取りをやめる」を押してから、もう一度「お知らせを受け取る」を押してください。',
-        };
+    const { sent, failures } = await sendTestNotice(viewer.userId, input.endpoint);
+    if (sent > 0) return { ok: true };
+    // 配信サービスが断った理由は、決めつけずにそのまま見せる（Issue #78）。以前は
+    // 「受け取りをやめてから、もう一度」と固定で出していたが、原因がこちらの送り方
+    // （Apple の BadJwtToken）だったときは、何度やり直しても直らなかった。
+    if (failures.length > 0) {
+      return {
+        ok: false,
+        reason: `送れませんでした。配信サービスからの返事: ${failures.join(' / ')}。主催者にこの文面をお伝えください。`,
+      };
+    }
+    // 理由が無いのは、配信サービスが「その宛先はもう無い」と返して登録を消したとき。
+    // 端末の側で登録し直せば直る。
+    return {
+      ok: false,
+      reason:
+        'この端末の登録が無効になっていました。「受け取りをやめる」を押してから、もう一度「お知らせを受け取る」を押してください。',
+    };
   });
 }
 
