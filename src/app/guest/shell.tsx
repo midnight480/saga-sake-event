@@ -1,6 +1,7 @@
 'use client';
 
 import { AppShell, type LogoutOptions, type Tab } from '@/components/AppShell';
+import { ConsentModal } from '@/components/ConsentModal';
 import { ReadyAlert } from '@/components/ReadyAlert';
 import { orderingStatus } from '@/lib/domain';
 import { useSnapshot } from '@/lib/useSnapshot';
@@ -27,7 +28,14 @@ const TABS: Tab[] = [
   { href: '/guest/help', label: 'ヘルプ', icon: '？' },
 ];
 
-export function GuestShell({ children }: { children: React.ReactNode }) {
+export function GuestShell({
+  needsConsent,
+  children,
+}: {
+  /** 利用規約・プライバシーポリシーの今の版に、まだ同意していないか（Issue #64）。 */
+  needsConsent: boolean;
+  children: React.ReactNode;
+}) {
   const { snapshot, isStale } = useSnapshot();
 
   return (
@@ -45,6 +53,7 @@ export function GuestShell({ children }: { children: React.ReactNode }) {
       {children}
       {/* できあがりを音・振動・帯で知らせる（Issue #58）。 */}
       {snapshot?.guest && <ReadyAlert guestClerkId={snapshot.guest.clerkUserId} />}
+      {needsConsent && <ConsentModal />}
     </AppShell>
   );
 }

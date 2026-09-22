@@ -325,6 +325,18 @@ export const STATEMENTS: string[] = [
      PRIMARY KEY (notice_id, clerk_user_id)
    )`,
 
+  // ── 利用規約・プライバシーポリシーへの同意（Issue #64）。
+  //    版ごとに 1 人 1 行。本文を改めて版を上げると、新しい版への同意が無いので、
+  //    もう一度聞く。端末の中に覚えるだけだと、消えたときに何度も聞かれるうえ、
+  //    同意を得た記録にもならないので、ここに残す。
+  //    「前回の記録を片付ける」でも消さない（イベントではなくアカウントに結びつくため）。──
+  `CREATE TABLE IF NOT EXISTS consents (
+     clerk_user_id text        NOT NULL,
+     version       text        NOT NULL,
+     agreed_at     timestamptz NOT NULL DEFAULT now(),
+     PRIMARY KEY (clerk_user_id, version)
+   )`,
+
   // ── 内部メモ（スキーマ版数など）──
   `CREATE TABLE IF NOT EXISTS app_meta (
      key   text PRIMARY KEY,

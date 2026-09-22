@@ -1458,3 +1458,25 @@ export async function countMessageRecipients(): Promise<Record<MessageAudience, 
     },
   };
 }
+
+// ─────────────────────────────────────────────────────────────
+// 利用規約・プライバシーポリシーへの同意（Issue #64）
+// ─────────────────────────────────────────────────────────────
+
+/** その版に同意しているか。 */
+export async function hasConsented(clerkUserId: string, version: string): Promise<boolean> {
+  const sql = await db();
+  const rows = (await sql`
+    SELECT 1 FROM consents WHERE clerk_user_id = ${clerkUserId} AND version = ${version} LIMIT 1
+  `) as unknown[];
+  return rows.length > 0;
+}
+
+/** 同意を残す。何度押しても 1 行のまま（最初に同意した日時を残す）。 */
+export async function recordConsent(clerkUserId: string, version: string): Promise<void> {
+  const sql = await db();
+  await sql`
+    INSERT INTO consents (clerk_user_id, version) VALUES (${clerkUserId}, ${version})
+    ON CONFLICT (clerk_user_id, version) DO NOTHING
+  `;
+}

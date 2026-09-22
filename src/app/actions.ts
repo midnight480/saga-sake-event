@@ -606,6 +606,23 @@ export async function fetchMessageRecipients(): Promise<
   });
 }
 
+/**
+ * 利用規約・プライバシーポリシーに同意する（Issue #64）。
+ * 受け取るのは画面が表示していた版。表示中に本文が改められていたら（版が違えば）断り、
+ * 新しい本文をもう一度読んでもらう。
+ */
+export async function agreeToLegal(version: string): Promise<ActionResult> {
+  return run(async () => {
+    const viewer = await requireViewer();
+    const { LEGAL_VERSION } = await import('@/lib/legal');
+    if (version !== LEGAL_VERSION) {
+      return { ok: false, reason: '利用規約が新しくなりました。画面を更新して、もう一度お読みください。' };
+    }
+    await store.recordConsent(viewer.userId, LEGAL_VERSION);
+    return { ok: true };
+  });
+}
+
 /** 自分が出した問い合わせと、その返事。 */
 export async function fetchMyInquiries(): Promise<ActionResult<Inquiry[]>> {
   return run(async () => {
