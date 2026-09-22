@@ -142,10 +142,15 @@ function BreweryRow({
               {brewery.items.map((item) => {
                 const left = itemAvailableCups(item);
                 const enough = item.accepting && left > 0 && item.ticketCost <= tickets;
+                // 押すとリクエスト画面へ移り、その銘柄の位置まで進む（Issue #68）。
+                // 銘柄を見てそのまま頼みたい人が押す場所なので、押せないと戸惑う。
+                // 指で確実に押せるよう、高さは 44px 以上にしている。
                 return (
-                  <div
+                  <Link
                     key={item.id}
-                    className="flex items-baseline justify-between gap-2 rounded-[7px] bg-ink/7 px-2.5 py-2"
+                    href={`/guest/breweries/${brewery.id}#item-${item.id}`}
+                    aria-label={`${item.name} をリクエストする画面へ`}
+                    className="flex min-h-11 items-center justify-between gap-2 rounded-[7px] bg-ink/7 px-2.5 py-2 transition-colors hover:bg-ink/12"
                   >
                     <span
                       className={`min-w-0 truncate text-[12px] leading-none ${
@@ -169,8 +174,11 @@ function BreweryRow({
                       >
                         {left === 0 ? '完売' : !item.accepting ? '停止中' : `残${left}`}
                       </span>
+                      <span aria-hidden className="text-[14px] text-ink-45">
+                        ›
+                      </span>
                     </span>
-                  </div>
+                  </Link>
                 );
               })}
             </div>
