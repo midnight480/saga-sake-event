@@ -213,7 +213,11 @@ Neon のドライバは Neon の HTTP 口とだけ話すので、ローカルの
 - 入力欄の `font-size` を 16px 未満にしない
 - `<video>` に `playsInline` を必ず付ける
 - 画面下端の余白は `env(safe-area-inset-bottom)` を使う
-- iOS はホーム画面に追加しないと通知を受け取れない
+- iOS はホーム画面に追加しないと通知を受け取れない。**Safari でも Chrome でも同じ**。
+  タブで開いている間は `PushManager` 自体が無いので、「仕組みがあるか」より先に
+  「iPhone か」を見る（`pwa.ts` の `pushSupport`）。逆にすると、iPhone では必ず
+  「このブラウザでは使えません」になる（Issue #50）
+- iPadOS 13 以降は Mac と名乗る。タッチ操作ができる「Mac」は iPad として扱う
 
 ### 失敗を日本語で返す
 

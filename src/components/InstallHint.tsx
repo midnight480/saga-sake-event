@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 
+import { AddToHomeSteps } from '@/components/AddToHomeSteps';
 import { Button } from '@/components/ui';
 import { hideInstallHint, installHintHidden, isInstalled, isIos } from '@/lib/pwa';
 
@@ -69,21 +70,8 @@ export function InstallHint() {
           <p>「まもなく終了します」などのお知らせが届くようになります。</p>
         </div>
 
-        <ol className="flex flex-col gap-2 rounded-field bg-ink/7 p-3.5 text-[12.5px] leading-[1.8] text-ink/85">
-          {ios ? (
-            <>
-              <li>1. 画面の下にある「共有」（□に↑）を押す</li>
-              <li>2. 「ホーム画面に追加」を選ぶ</li>
-              <li>3. 右上の「追加」を押す</li>
-            </>
-          ) : (
-            <>
-              <li>1. 画面の右上にある「⋮」を押す</li>
-              <li>2. 「アプリをインストール」または「ホーム画面に追加」を選ぶ</li>
-              <li>3. 「インストール」を押す</li>
-            </>
-          )}
-        </ol>
+        {/* ブラウザごとに共有ボタンの場所が違うので、部品に任せる（Issue #50）。 */}
+        <AddToHomeSteps />
 
         <label className="flex items-center gap-2.5 text-[12px] text-ink-55">
           <input

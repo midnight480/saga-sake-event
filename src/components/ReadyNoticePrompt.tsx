@@ -1,5 +1,6 @@
 'use client';
 
+import { AddToHomeSteps } from '@/components/AddToHomeSteps';
 import { Button, Notice } from '@/components/ui';
 import { usePushSubscription } from '@/lib/usePushSubscription';
 
@@ -23,11 +24,11 @@ export function ReadyNoticePrompt() {
 
   if (state === 'need-install') {
     return (
-      <div className="px-5 pt-3">
+      <div className="flex flex-col gap-2 px-5 pt-3">
         <Notice tone="info" title="できあがりを通知で受け取れます">
           iPhone では、ホーム画面に追加して、そのアイコンから開くと通知を受け取れます。
-          画面下の「共有」→「ホーム画面に追加」からどうぞ。
         </Notice>
+        <AddToHomeSteps />
       </div>
     );
   }
