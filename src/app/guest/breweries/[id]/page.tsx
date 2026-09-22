@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { useState, useTransition } from 'react';
+import { useEffect, useState, useTransition } from 'react';
 
 import { order } from '@/app/actions';
 import {
@@ -153,6 +153,19 @@ function OrderCard({
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
+  // 酒蔵の一覧で銘柄を押して来たときは、その銘柄の位置まで進み、少しの間だけ
+  // 枠を光らせる（Issue #68）。下のほうの銘柄を押したのに、画面の上から探し直す
+  // ことにならないように。上のヘッダとメニューに隠れないよう、画面の真ん中に寄せる。
+  const anchor = `item-${item.id}`;
+  const [highlight, setHighlight] = useState(false);
+  useEffect(() => {
+    if (window.location.hash !== `#${anchor}`) return;
+    document.getElementById(anchor)?.scrollIntoView({ block: 'center' });
+    setHighlight(true);
+    const timer = setTimeout(() => setHighlight(false), 2200);
+    return () => clearTimeout(timer);
+  }, [anchor]);
+
   // 他の人がすでに注文して受け取っていない分を引いた「いま頼める杯数」。
   // ここを物理的な残りにすると、最後の数杯で注文が弾かれる理由が分からなくなる。
   const left = itemAvailableCups(item);
@@ -197,6 +210,10 @@ function OrderCard({
   };
 
   return (
+    <div
+      id={anchor}
+      className={`rounded-card transition-shadow duration-500 ${highlight ? 'ring-2 ring-gold' : ''}`}
+    >
     <Card className={soldOut || paused ? 'opacity-50' : undefined}>
       <div className="flex items-start justify-between gap-2.5">
         <div className="flex min-w-0 flex-col gap-1.5">
@@ -258,5 +275,6 @@ function OrderCard({
         )}
       </div>
     </Card>
+    </div>
   );
 }
