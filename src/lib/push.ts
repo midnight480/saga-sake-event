@@ -119,7 +119,21 @@ interface NoticePayload {
   url: string;
   /** 同じ tag の通知は重ならず、新しいほうに置き換わる。 */
   tag?: string;
+  /**
+   * 押すか閉じるまで、通知を出したままにする。数秒で引っ込むと、手がふさがって
+   * いる間に見逃す。効くのはパソコンの Chrome・Edge（Android は通知欄に残るが、
+   * 画面の上に出る帯は数秒で消える。iPhone は対応していない）。
+   */
+  requireInteraction?: boolean;
+  /** 振動のしかた（ミリ秒で、振動・休み・振動…）。Android のみ。 */
+  vibrate?: number[];
 }
+
+/**
+ * 蔵に新しいリクエストを知らせるときの振動。
+ * ふだんの通知（短く 1〜2 回）と区別できるよう、長め・3 回にする。
+ */
+export const NEW_REQUEST_VIBRATION = [500, 200, 500, 200, 900];
 
 /**
  * 決まった宛先に送る。
@@ -246,6 +260,9 @@ export async function sendNewRequestNotice(requestId: number): Promise<number> {
     body: `「${request.brand}」${request.cups} 杯 ・ ${request.guest_label}`,
     url: '/brewery',
     tag: `request-${requestId}`,
+    // 手がふさがっていても見逃さないよう、消えずに残し、独自の振動で知らせる。
+    requireInteraction: true,
+    vibrate: NEW_REQUEST_VIBRATION,
   });
 }
 

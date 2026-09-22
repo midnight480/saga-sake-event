@@ -15,7 +15,7 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('push', (event) => {
-  let data = { title: '佐賀 蔵めぐり', body: '', url: '/', tag: '' };
+  let data = { title: '佐賀 蔵めぐり', body: '', url: '/', tag: '', requireInteraction: false, vibrate: null };
   try {
     if (event.data) data = { ...data, ...event.data.json() };
   } catch {
@@ -30,6 +30,10 @@ self.addEventListener('push', (event) => {
       // 同じ知らせが重ならないようにする。送る側が tag を決めていればそれを使う
       // （準備完了の通知は注文ごとに別の tag。別の注文の知らせを上書きしない）。
       tag: data.tag || data.url + data.title,
+      // 送る側が決めたときだけ付ける（蔵への新しいリクエストの知らせ）。
+      // 押すか閉じるまで出したままにし、ふだんと違う長めの振動で知らせる。
+      requireInteraction: data.requireInteraction === true,
+      ...(Array.isArray(data.vibrate) ? { vibrate: data.vibrate } : {}),
       data: { url: data.url },
     }),
   );
