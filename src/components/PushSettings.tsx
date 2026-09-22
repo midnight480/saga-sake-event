@@ -13,7 +13,7 @@ import { usePushSubscription } from '@/lib/usePushSubscription';
  * できあがったときにも届く（Issue #35）。
  */
 export function PushSettings({ extraReasons = [] }: { extraReasons?: string[] }) {
-  const { state, error, pending, turnOn, turnOff } = usePushSubscription();
+  const { state, error, pending, turnOn, turnOff, test, tested } = usePushSubscription();
 
   return (
     <HelpSection title="お知らせを受け取る">
@@ -75,6 +75,16 @@ export function PushSettings({ extraReasons = [] }: { extraReasons?: string[] })
       {state === 'on' && (
         <Card>
           <p className="text-[12.5px] leading-[1.8] text-matcha">この端末で受け取る設定です。</p>
+          {/* 届くかどうかを、その場で確かめられるように（Issue #76）。 */}
+          <Button tone="ghost" block onClick={test} disabled={pending}>
+            {pending ? '送っています…' : '試しに 1 通送る'}
+          </Button>
+          {tested && (
+            <p className="text-[12px] leading-[1.8] text-ink-70">
+              送りました。数秒待っても届かないときは、端末の設定でこのアプリ（iPhone はホーム画面の
+              アイコン）の通知が許可されているか確かめてください。
+            </p>
+          )}
           <Button tone="flat" block onClick={turnOff} disabled={pending}>
             受け取りをやめる
           </Button>

@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react';
 
-import { setAccepting, setBrandAccepting, setRequestStatus } from '@/app/actions';
+import { remindGuest, setAccepting, setBrandAccepting, setRequestStatus } from '@/app/actions';
 import { AlertSettings } from '@/components/AlertSettings';
 import {
   Button,
@@ -17,6 +17,7 @@ import {
 import {
   STATUS_FLOW,
   UNDELIVERED_STATUSES,
+  canRemind,
   itemAvailableCups,
   minutesSince,
   waitingCount,
@@ -320,6 +321,19 @@ function QueueCard({
     });
   };
 
+  // 取りに来ていない人への催促（Issue #73）。できあがってからの時間を出して、
+  // 押すかどうかを蔵が判断できるようにする。続けて押せないよう、間隔を空ける。
+  const readyFor = request.status === 'ready' ? minutesSince(request.updatedAt, now) : 0;
+  const remindable = canRemind(request, now);
+  const remind = () => {
+    setError(null);
+    startTransition(async () => {
+      const result = await remindGuest(request.id);
+      if (!result.ok) setError(result.reason);
+      await onRefresh();
+    });
+  };
+
   return (
     <Card animate>
       <div className="flex items-start justify-between gap-2.5">
@@ -335,6 +349,30 @@ function QueueCard({
       </div>
 
       {error && <Notice tone="danger">{error}</Notice>}
+
+      {request.status === 'ready' && (
+        <div className="flex items-center justify-between gap-3 rounded-field bg-ink/7 px-3 py-2">
+          <span className="min-w-0 text-[11.5px] leading-[1.6] text-ink-70">
+            できあがってから {readyFor} 分
+            {request.remindedAt && (
+              <>
+                <br />
+                <span className="text-ink-45">
+                  {minutesSince(request.remindedAt, now)} 分前に催促しました
+                </span>
+              </>
+            )}
+          </span>
+          <Button
+            tone="flat"
+            className="flex-none"
+            onClick={remind}
+            disabled={pending || !remindable}
+          >
+            {remindable ? '催促する' : '催促済み'}
+          </Button>
+        </div>
+      )}
 
       {actions.length > 0 && (
         <div className="flex flex-wrap gap-2 border-t border-hairline pt-3">

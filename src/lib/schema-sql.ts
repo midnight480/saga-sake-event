@@ -385,6 +385,10 @@ export const SEED_STATEMENTS: string[] = [
   `ALTER TABLE items ADD CONSTRAINT items_sweetness_valid
      CHECK (sweetness IN ('', '大甘口', '甘口', '普通', '辛口', '大辛口'))`,
 
+  // 取りに来ていない参加者への催促（Issue #73）を足した分の移行。
+  // 最後に催促した時刻。連打で何度も鳴らさないよう、間隔の判定に使う。
+  `ALTER TABLE requests ADD COLUMN IF NOT EXISTS reminded_at timestamptz`,
+
   // 銘柄ごとの受付停止（Issue #43）を足した分の移行。既存の銘柄は受付中のまま。
   `ALTER TABLE items ADD COLUMN IF NOT EXISTS accepting boolean NOT NULL DEFAULT true`,
 

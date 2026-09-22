@@ -154,6 +154,7 @@ async function sendTo(targets: PushTarget[], notice: NoticePayload): Promise<num
 
   const payload = JSON.stringify(notice);
   const dead: string[] = [];
+  const failed: string[] = [];
   let sent = 0;
 
   await Promise.all(
@@ -168,6 +169,16 @@ async function sendTo(targets: PushTarget[], notice: NoticePayload): Promise<num
         const status = (error as { statusCode?: number }).statusCode;
         // 404 / 410 は「その宛先はもう無い」という意味。消してよい。
         if (status === 404 || status === 410) dead.push(t.endpoint);
+        // それ以外の失敗は、届かなかった原因を後から追えるように残す（Issue #76）。
+        // 宛先の URL は端末を特定できるので、配信サービスの名前（ホスト）だけ出す。
+        else {
+          failed.push(t.endpoint);
+          console.error('[push] 送信に失敗しました', {
+            status,
+            host: new URL(t.endpoint).host,
+            message: error instanceof Error ? error.message : String(error),
+          });
+        }
       }
     }),
   );
@@ -175,7 +186,31 @@ async function sendTo(targets: PushTarget[], notice: NoticePayload): Promise<num
   if (dead.length > 0) {
     await sql`DELETE FROM push_subscriptions WHERE endpoint = ANY(${dead}::text[])`;
   }
+  if (failed.length > 0) {
+    await sql`UPDATE push_subscriptions SET failed_at = now() WHERE endpoint = ANY(${failed}::text[])`;
+  }
   return sent;
+}
+
+/**
+ * この端末に、試しのお知らせを 1 通送る（Issue #76）。
+ *
+ * 「設定したのに届かない」を、その場で本人が確かめられるようにする。送る先は、
+ * 本人の登録のうち、いま使っている端末のものだけ。ほかの人の端末には送れない。
+ * 🔔 には残さない（ただの確認なので）。
+ */
+export async function sendTestNotice(clerkUserId: string, endpoint: string): Promise<number> {
+  const sql = await db();
+  const targets = (await sql`
+    SELECT endpoint, p256dh, auth FROM push_subscriptions
+    WHERE clerk_user_id = ${clerkUserId} AND endpoint = ${endpoint}
+  `) as PushTarget[];
+  return sendTo(targets, {
+    title: '試しのお知らせです',
+    body: 'この端末でお知らせを受け取れます。アプリを閉じていても、このように届きます。',
+    url: '/',
+    tag: `test-${Date.now()}`,
+  });
 }
 
 /** 登録している全員に送る。節目のお知らせで使う。 */
@@ -197,7 +232,10 @@ async function sendToAll(title: string, body: string, url: string): Promise<numb
  * 状態の更新は「いまの状態が準備中なら」を条件にした 1 文なので、同じ注文で
  * 2 回成功することはなく、二重には届かない。
  */
-export async function sendReadyNotice(requestId: number): Promise<number> {
+export async function sendReadyNotice(
+  requestId: number,
+  options: { reminder?: boolean } = {},
+): Promise<number> {
   const sql = await db();
   const rows = (await sql`
     SELECT r.guest_clerk_id, r.brand, r.cups, b.name AS brewery_name
@@ -210,11 +248,18 @@ export async function sendReadyNotice(requestId: number): Promise<number> {
   const request = rows[0];
   if (!request) return 0;
 
-  const notice = {
-    title: 'できあがりました',
-    body: `${request.brewery_name}の「${request.brand}」（${request.cups} 杯）を、ブースで受け取ってください。`,
-    url: '/guest',
-  };
+  // 催促（Issue #73）は、蔵が待っていることが伝わる言葉にする。
+  const notice = options.reminder
+    ? {
+        title: '蔵がお待ちしています',
+        body: `${request.brewery_name}の「${request.brand}」（${request.cups} 杯）ができあがっています。ブースで受け取ってください。`,
+        url: '/guest',
+      }
+    : {
+        title: 'できあがりました',
+        body: `${request.brewery_name}の「${request.brand}」（${request.cups} 杯）を、ブースで受け取ってください。`,
+        url: '/guest',
+      };
 
   // 先に 🔔 の履歴へ残す。通知を許可していない人・iPhone でホーム画面に
   // 追加していない人にも、アプリの中では必ず見えるようにするため。
@@ -230,7 +275,9 @@ export async function sendReadyNotice(requestId: number): Promise<number> {
 
   return sendTo(targets, {
     ...notice,
-    tag: `ready-${requestId}`,
+    // 催促は毎回別の tag にする。同じ tag だと、前の知らせを静かに置き換えるだけで
+    // 鳴らない端末がある。
+    tag: options.reminder ? `remind-${requestId}-${Date.now()}` : `ready-${requestId}`,
     // 取りに行く合図なので見逃さないよう、消えずに残し、長めの振動にする（Issue #58）。
     requireInteraction: true,
     vibrate: READY_VIBRATION,

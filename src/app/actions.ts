@@ -389,9 +389,59 @@ export async function setRequestStatus(
   });
 }
 
+/**
+ * 取りに来ていない参加者に、もう一度知らせる（Issue #73）。
+ *
+ * 蔵は自分の注文だけ。主催者は当日の代理対応があるので全件。間隔の判定と記録は
+ * store.markReminded の 1 文で行い、記録できたときだけ送る。
+ */
+export async function remindGuest(requestId: number): Promise<ActionResult> {
+  return run(async () => {
+    const viewer = await requireViewer();
+    if (viewer.role === 'guest') {
+      return { ok: false, reason: '催促は蔵と主催者だけが送れます。' };
+    }
+    const result = await store.markReminded(
+      requestId,
+      viewer.role === 'brewery' ? viewer.breweryId : undefined,
+    );
+    refresh();
+    if (result.ok) {
+      after(async () => {
+        try {
+          const { sendReadyNotice } = await import('@/lib/push');
+          await sendReadyNotice(requestId, { reminder: true });
+        } catch (error) {
+          console.error('[push] 催促の通知に失敗しました', error);
+        }
+      });
+    }
+    return result.ok ? { ok: true } : { ok: false, reason: result.reason };
+  });
+}
+
 // ═════════════════════════════════════════════════════════════
 // 参加者
 // ═════════════════════════════════════════════════════════════
+
+/**
+ * 参加者が、ブースでお酒を受け取ったことを自分で確かめる（Issue #72）。
+ *
+ * 蔵の人に画面を見せて、その場で押してもらう。蔵が「受渡完了」を押す道も残す
+ * （スマホの操作に慣れていない人は、蔵に任せられるように）。どちらが先でも、
+ * 数字が動くのは 1 回だけ（store.confirmReceived）。
+ */
+export async function confirmReceived(requestId: number): Promise<ActionResult> {
+  return run(async () => {
+    const viewer = await requireViewer();
+    if (viewer.role !== 'guest') {
+      return { ok: false, reason: '受け取りの確認は、注文した参加者の画面から行ってください。' };
+    }
+    const result = await store.confirmReceived(requestId, viewer.userId);
+    refresh();
+    return result.ok ? { ok: true } : { ok: false, reason: result.reason };
+  });
+}
 
 export async function order(itemId: string, cups: number): Promise<ActionResult<{ spent: number }>> {
   return run(async () => {
@@ -685,6 +735,30 @@ export async function subscribeToPush(input: {
     const { saveSubscription } = await import('@/lib/push');
     await saveSubscription({ ...input, clerkUserId: viewer.userId, role: viewer.role });
     return { ok: true };
+  });
+}
+
+/**
+ * この端末に試しのお知らせを送る（Issue #76）。
+ * 送る前に登録し直すので、サーバー側の登録が消えていた場合もここで直る。
+ */
+export async function sendTestPush(input: {
+  endpoint: string;
+  p256dh: string;
+  auth: string;
+}): Promise<ActionResult> {
+  return run(async () => {
+    const viewer = await requireViewer();
+    const { saveSubscription, sendTestNotice } = await import('@/lib/push');
+    await saveSubscription({ ...input, clerkUserId: viewer.userId, role: viewer.role });
+    const sent = await sendTestNotice(viewer.userId, input.endpoint);
+    return sent > 0
+      ? { ok: true }
+      : {
+          ok: false,
+          reason:
+            '送れませんでした。「受け取りをやめる」を押してから、もう一度「お知らせを受け取る」を押してください。',
+        };
   });
 }
 

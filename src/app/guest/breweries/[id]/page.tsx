@@ -31,6 +31,10 @@ import { useSnapshot } from '@/lib/useSnapshot';
 export default function GuestBreweryDetailPage() {
   const params = useParams<{ id: string }>();
   const { snapshot, isInitialLoading } = useSnapshot();
+  // この画面で送ったリクエスト（Issue #70）。送っている間と、送れてマイページへ移るまでの
+  // 間は、ほかの銘柄のボタンも押せなくする。会場の現在値は 4 秒ごとにしか取り直さないので、
+  // それを待つと「受け取り待ち」になるまでの一瞬、2 つ目が押せてしまっていた。
+  const [sending, setSending] = useState<'sending' | 'sent' | null>(null);
 
   if (isInitialLoading || !snapshot) return <Empty>読み込んでいます…</Empty>;
 
@@ -124,10 +128,17 @@ export default function GuestBreweryDetailPage() {
               key={item.id}
               item={item}
               tickets={guest?.tickets ?? 0}
-              blocked={!status.open || !brewery.accepting || !!undelivered}
+              blocked={!status.open || !brewery.accepting || !!undelivered || sending !== null}
               blockedReason={
-                !status.open ? status.label : !brewery.accepting ? '受付停止中' : '受け取り待ちです'
+                !status.open
+                  ? status.label
+                  : !brewery.accepting
+                    ? '受付停止中'
+                    : sending === 'sending'
+                      ? 'ほかのリクエストを送っています…'
+                      : '受け取り待ちです'
               }
+              onSending={setSending}
             />
           ))
         )}
@@ -141,11 +152,14 @@ function OrderCard({
   tickets,
   blocked,
   blockedReason,
+  onSending,
 }: {
   item: Item;
   tickets: number;
   blocked: boolean;
   blockedReason: string;
+  /** 送りはじめ（sending）・送れた（sent）・失敗して戻す（null）を画面全体に伝える。 */
+  onSending: (state: 'sending' | 'sent' | null) => void;
 }) {
   const router = useRouter();
   const { refresh } = useSnapshot();
@@ -192,13 +206,17 @@ function OrderCard({
     // この押した瞬間に、音を鳴らせる状態にしておく（Issue #58）。できあがりの知らせは
     // このあとで届くので、ここで開けておけば最初のできあがりから鳴る。
     void unlockSound();
+    onSending('sending');
     startTransition(async () => {
       const result = await order(item.id, cups);
       if (!result.ok) {
         setError(result.reason);
+        onSending(null);
         await refresh();
         return;
       }
+      // 画面を移るまで、ほかの銘柄は押せないままにしておく。
+      onSending('sent');
       // 送ったあとに見たいのは、この銘柄ではなく自分の注文の進み具合。
       // 画面に留めると、間違えてもう一度押してしまうことにもなる。
       await refresh();

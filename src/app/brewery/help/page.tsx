@@ -77,6 +77,17 @@ export default function BreweryHelpPage() {
           押してください。
         </HelpNote>
         <HelpText>
+          参加者が自分の画面で<strong className="text-ink">「受け取りました」</strong>を
+          押しても、受渡完了になります。お渡しするときに参加者の画面を見せてもらい、
+          その場で押してもらうと、別の方の注文との取り違えに気づけます。スマホの操作が
+          難しい方には、蔵の「受渡完了」で構いません。
+        </HelpText>
+        <HelpText>
+          準備完了のまま取りに来ない方には、<strong className="text-ink">「催促する」</strong>を
+          押してください。参加者のスマホにもう一度知らせが届きます。続けて鳴らさないよう、
+          1 分に 1 回までです。
+        </HelpText>
+        <HelpText>
           押すたびに、参加者の画面の言葉が変わります。「準備中にする」を押せば、
           参加者には「いま注いでいます。ブース前でお待ちください」と出ます。
         </HelpText>
