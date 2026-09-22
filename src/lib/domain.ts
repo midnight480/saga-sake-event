@@ -673,3 +673,27 @@ export interface Notice {
   createdAt: string; // ISO
   read: boolean;
 }
+
+// ─────────────────────────────────────────────────────────────
+// 蔵に知らせる新しいリクエスト（Issue #51）
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * 前回までに見ていない「受付済」の注文を返し、見たものとして覚える。
+ *
+ * seen が null（画面を開いた直後）のときは、いまある注文を覚えるだけで何も返さない。
+ * 開き直すたびに鳴ると、どれが新しいのか分からなくなるため。
+ * 受付済のものだけを見る。準備中などに進んだものは、もう蔵が手を付けている。
+ */
+export function takeNewRequests(
+  seen: Set<number> | null,
+  requests: OrderRequest[],
+  breweryId: string,
+): { seen: Set<number>; arrived: OrderRequest[] } {
+  const accepted = requests.filter((r) => r.breweryId === breweryId && r.status === 'accepted');
+  if (seen === null) return { seen: new Set(accepted.map((r) => r.id)), arrived: [] };
+  const arrived = accepted.filter((r) => !seen.has(r.id));
+  const next = new Set(seen);
+  arrived.forEach((r) => next.add(r.id));
+  return { seen: next, arrived };
+}

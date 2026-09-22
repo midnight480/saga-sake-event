@@ -11,7 +11,7 @@ export default function BreweryHelpPage() {
         <Title>酒蔵の使い方</Title>
       </ScreenHeader>
 
-      <PushSettings />
+      <PushSettings extraReasons={['参加者から新しいリクエストが届いたとき']} />
 
       <HelpSection title="開場前に、この順で">
         <HelpSteps
@@ -50,6 +50,17 @@ export default function BreweryHelpPage() {
           <strong className="text-ink">受付キュー</strong>を開いたままにしてください。
           参加者が注文すると、ここに並びます。
         </HelpText>
+        <HelpText>
+          新しいリクエストが来ると、画面の下に帯が出て、タブの題名に件数が付きます。
+          開場前に、受付キューの「新しいリクエストの知らせ方」→「変える」で、
+          <strong className="text-ink">音・振動・画面をつけたまま・スマホの通知</strong>
+          を選んでおいてください。手がふさがっていても気づけます。
+        </HelpText>
+        <HelpNote>
+          音は、画面に一度触れるまで鳴りません（ブラウザの決まり）。「音」を押すと試し音が
+          鳴り、鳴る状態になります。iPhone は消音スイッチが入っていると鳴らず、振動も
+          使えません。iPhone では「スマホの通知」も合わせて使ってください。
+        </HelpNote>
         <HelpText>1 件ずつ、次の順にボタンを押します。</HelpText>
         <div className="rounded-card border border-hairline bg-card p-4 font-mono text-[11.5px] leading-[2] text-ink-70">
           受付済

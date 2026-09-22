@@ -3,6 +3,7 @@
 import { useState, useTransition } from 'react';
 
 import { setAccepting, setBrandAccepting, setRequestStatus } from '@/app/actions';
+import { AlertSettings } from '@/components/AlertSettings';
 import { Button, Card, Empty, Eyebrow, Notice, StatusBadge, Title } from '@/components/ui';
 import {
   STATUS_FLOW,
@@ -19,7 +20,7 @@ import { useBreweryContext } from './shell';
 
 /** 受付キュー。当日、蔵の担当者がいちばん長く見る画面。 */
 export default function BreweryQueuePage() {
-  const { breweryId } = useBreweryContext();
+  const { breweryId, asOrganizer } = useBreweryContext();
   const { snapshot, isInitialLoading, refresh } = useSnapshot();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -83,6 +84,9 @@ export default function BreweryQueuePage() {
         )}
 
         {brewery.items.length > 0 && <ItemAccepting items={brewery.items} onRefresh={refresh} />}
+
+        {/* 新しいリクエストの知らせ方（Issue #51）。代理で見ている主催者には出さない。 */}
+        {!asOrganizer && <AlertSettings />}
       </header>
 
       {error && (
