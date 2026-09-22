@@ -7,7 +7,7 @@ import { useState, useTransition, type ReactNode } from 'react';
 
 import { NoticeBell } from '@/components/NoticeBell';
 import { ConfirmDialog } from '@/components/ui';
-import type { OrderingStatus } from '@/lib/domain';
+import { EVENT_PERIOD_LABEL, type EventPeriod } from '@/lib/domain';
 import { usePushResync } from '@/lib/usePushSubscription';
 import { useSnapshot } from '@/lib/useSnapshot';
 
@@ -36,7 +36,7 @@ export function AppShell({
   role,
   roleEn,
   subject,
-  status,
+  period,
   tabs,
   stale,
   logout,
@@ -45,7 +45,8 @@ export function AppShell({
   role: string;
   roleEn: string;
   subject?: string;
-  status?: OrderingStatus;
+  /** イベントの前・最中・後（Issue #84）。受付の状態ではない。 */
+  period?: EventPeriod;
   tabs: Tab[];
   stale?: boolean;
   logout: LogoutOptions;
@@ -84,7 +85,7 @@ export function AppShell({
               </span>
             </div>
             <div className="flex flex-none items-center gap-1">
-              {status && <StatusChip status={status} />}
+              {period && <PeriodChip period={period} />}
               {/* 画面の更新。🔔 の左に置く（Issue #49）。 */}
               <RefreshButton />
               {/* お知らせの履歴。右上に置き、未読の数を出す。 */}
@@ -230,16 +231,23 @@ function LogoutTab({ redirectUrl, note }: LogoutOptions) {
 }
 
 /**
- * いま受付をしているかどうかの表示。
- * 予定どおりか、主催者が手で決めたのかが分かるようにしている。
+ * イベントの前・最中・後の表示（Issue #84）。開催日と時刻だけで決まる。
+ *
+ * 以前はここに受付の状態（「受付中」「終了」、手動で止めたら「停止中（手動）」）を
+ * 出していたが、「受付中」が何の受付か分からず、勘違いのもとになっていた。
+ * 受付を手で止めていることは、リクエストの画面と主催者のイベント設定に出している。
+ *
+ * 文字が長くなったぶん、左右の余白を詰めている。幅が足りない端末では、左の
+ * 蔵名・参加者番号の側が「…」で切れる（こちらは切らない）。
  */
-function StatusChip({ status }: { status: OrderingStatus }) {
-  const dot = status.open ? 'bg-matcha' : status.manual ? 'bg-terracotta' : 'bg-gold';
+function PeriodChip({ period }: { period: EventPeriod }) {
+  const dot =
+    period === 'during' ? 'bg-matcha pulse-dot' : period === 'before' ? 'bg-gold' : 'bg-ink-45';
   return (
-    <span className="flex flex-none items-center gap-2 rounded-full border border-hairline-strong bg-card px-3 py-1.5">
-      <span className={`size-[7px] rounded-full ${dot} ${status.open ? 'pulse-dot' : ''}`} />
+    <span className="flex flex-none items-center gap-1.5 rounded-full border border-hairline-strong bg-card px-2.5 py-1.5">
+      <span className={`size-[7px] rounded-full ${dot}`} />
       <span className="text-[11.5px] font-bold leading-none whitespace-nowrap text-ink">
-        {status.label}
+        {EVENT_PERIOD_LABEL[period]}
       </span>
     </span>
   );

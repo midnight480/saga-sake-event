@@ -4,7 +4,7 @@ import { AppShell, type LogoutOptions, type Tab } from '@/components/AppShell';
 import { ConsentModal } from '@/components/ConsentModal';
 import { DeliveredAlert } from '@/components/DeliveredAlert';
 import { ReadyAlert } from '@/components/ReadyAlert';
-import { orderingStatus } from '@/lib/domain';
+import { eventPeriod } from '@/lib/domain';
 import { useSnapshot } from '@/lib/useSnapshot';
 
 /** 参加者のポイントと記録は、アカウント（メールアドレス）に結びついて残る。 */
@@ -44,9 +44,7 @@ export function GuestShell({
       role="参加者"
       roleEn="GUEST"
       subject={snapshot?.guest?.displayNo}
-      status={
-        snapshot ? orderingStatus(snapshot.event, new Date(snapshot.serverTime)) : undefined
-      }
+      period={snapshot ? eventPeriod(snapshot.event, new Date(snapshot.serverTime)) : undefined}
       tabs={TABS}
       stale={isStale}
       logout={LOGOUT}

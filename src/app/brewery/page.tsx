@@ -20,6 +20,7 @@ import {
   canRemind,
   itemAvailableCups,
   minutesSince,
+  orderingStatus,
   waitingCount,
   type Item,
   type OrderRequest,
@@ -53,6 +54,10 @@ export default function BreweryQueuePage() {
     });
 
   const waiting = waitingCount(snapshot.waitingByBrewery, breweryId);
+  // 主催者が会場全体の受付を手で止めているか。以前は右上に「停止中（手動）」と
+  // 出ていたが、右上はイベントの前・最中・後の表示に変えた（Issue #84）。
+  // 注文が来ない理由が分からなくならないよう、ここに出す。
+  const venue = orderingStatus(snapshot.event, new Date(snapshot.serverTime));
 
   const setBreweryAccepting = (accepting: boolean) => {
     setError(null);
@@ -104,6 +109,11 @@ export default function BreweryQueuePage() {
         {!brewery.accepting && (
           <Notice tone="warn">
             いま受付を止めています。参加者の画面には「受付停止中」と出て、注文できません。
+          </Notice>
+        )}
+        {venue.manual && !venue.open && (
+          <Notice tone="info">
+            いま主催者が会場全体の受付を止めています。再開するまで、新しい注文は届きません。
           </Notice>
         )}
 

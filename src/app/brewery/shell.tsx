@@ -5,7 +5,7 @@ import { createContext, useContext } from 'react';
 import { AppShell, type LogoutOptions, type Tab } from '@/components/AppShell';
 import { ConsentModal } from '@/components/ConsentModal';
 import { NewRequestAlert } from '@/components/NewRequestAlert';
-import { orderingStatus } from '@/lib/domain';
+import { eventPeriod } from '@/lib/domain';
 import { useSnapshot } from '@/lib/useSnapshot';
 
 /**
@@ -79,9 +79,7 @@ export function BreweryShell({
         role="酒蔵"
         roleEn="BREWERY"
         subject={brewery?.name}
-        status={
-        snapshot ? orderingStatus(snapshot.event, new Date(snapshot.serverTime)) : undefined
-      }
+        period={snapshot ? eventPeriod(snapshot.event, new Date(snapshot.serverTime)) : undefined}
         tabs={TABS}
         stale={isStale}
         logout={asOrganizer ? ORGANIZER_LOGOUT : BREWERY_LOGOUT}
