@@ -23,8 +23,23 @@ async function db() {
   return getSql();
 }
 
-/** 送信元として名乗る連絡先。実在しなくても動くが、形式は要る。 */
-const CONTACT = 'mailto:noreply@saga-sake-event.invalid';
+/**
+ * 送信元として名乗る連絡先（VAPID の subject）。
+ *
+ * 以前は `mailto:noreply@saga-sake-event.invalid` にしていた。Google（Android・パソコンの
+ * Chrome）と Mozilla は形式さえ合っていれば通すが、**Apple（iPhone）は存在しない
+ * ドメインや localhost を名乗ると 403 BadJwtToken で断る**。そのため iPhone にだけ
+ * 1 通も届かなかった（Issue #78。「試しに 1 通送る」も失敗していた）。
+ *
+ * このサイト自身の URL を名乗る。Vercel が自動で入れる本番のドメインを使うので、
+ * 主催者の設定は増えない。ローカル開発などで分からないときは、このアプリの置き場所を
+ * 名乗る（Apple が受け付ける、実在する https の URL であればよい）。
+ */
+function contact(): string {
+  const host =
+    process.env.VERCEL_PROJECT_PRODUCTION_URL?.trim() || process.env.VERCEL_URL?.trim();
+  return host ? `https://${host}` : 'https://github.com/midnight480/saga-sake-event';
+}
 
 let cached: { publicKey: string; privateKey: string } | null = null;
 
@@ -145,16 +160,20 @@ export const READY_VIBRATION = [250, 120, 250, 120, 250, 120, 700];
  * 決まった宛先に送る。
  * 宛先が無効になっていたら（端末が消えた、許可を取り消した）その行を消す。
  */
-async function sendTo(targets: PushTarget[], notice: NoticePayload): Promise<number> {
-  if (targets.length === 0) return 0;
+async function sendTo(
+  targets: PushTarget[],
+  notice: NoticePayload,
+): Promise<{ sent: number; failures: string[] }> {
+  if (targets.length === 0) return { sent: 0, failures: [] };
 
   const sql = await db();
   const keys = await vapidKeys();
-  webpush.setVapidDetails(CONTACT, keys.publicKey, keys.privateKey);
+  webpush.setVapidDetails(contact(), keys.publicKey, keys.privateKey);
 
   const payload = JSON.stringify(notice);
   const dead: string[] = [];
   const failed: string[] = [];
+  const failures: string[] = [];
   let sent = 0;
 
   await Promise.all(
@@ -166,16 +185,21 @@ async function sendTo(targets: PushTarget[], notice: NoticePayload): Promise<num
         );
         sent += 1;
       } catch (error) {
-        const status = (error as { statusCode?: number }).statusCode;
+        const { statusCode: status, body } = error as { statusCode?: number; body?: string };
         // 404 / 410 は「その宛先はもう無い」という意味。消してよい。
         if (status === 404 || status === 410) dead.push(t.endpoint);
         // それ以外の失敗は、届かなかった原因を後から追えるように残す（Issue #76）。
         // 宛先の URL は端末を特定できるので、配信サービスの名前（ホスト）だけ出す。
+        // 配信サービスが返した本文（Apple なら {"reason":"BadJwtToken"} など）も残す。
+        // 以前は残しておらず、状態番号だけでは原因を絞れなかった（Issue #78）。
         else {
+          const host = new URL(t.endpoint).host;
           failed.push(t.endpoint);
+          failures.push(`${host} ${status ?? ''} ${body ?? ''}`.trim());
           console.error('[push] 送信に失敗しました', {
             status,
-            host: new URL(t.endpoint).host,
+            host,
+            body,
             message: error instanceof Error ? error.message : String(error),
           });
         }
@@ -189,7 +213,7 @@ async function sendTo(targets: PushTarget[], notice: NoticePayload): Promise<num
   if (failed.length > 0) {
     await sql`UPDATE push_subscriptions SET failed_at = now() WHERE endpoint = ANY(${failed}::text[])`;
   }
-  return sent;
+  return { sent, failures };
 }
 
 /**
@@ -199,7 +223,10 @@ async function sendTo(targets: PushTarget[], notice: NoticePayload): Promise<num
  * 本人の登録のうち、いま使っている端末のものだけ。ほかの人の端末には送れない。
  * 🔔 には残さない（ただの確認なので）。
  */
-export async function sendTestNotice(clerkUserId: string, endpoint: string): Promise<number> {
+export async function sendTestNotice(
+  clerkUserId: string,
+  endpoint: string,
+): Promise<{ sent: number; failures: string[] }> {
   const sql = await db();
   const targets = (await sql`
     SELECT endpoint, p256dh, auth FROM push_subscriptions
@@ -219,7 +246,7 @@ async function sendToAll(title: string, body: string, url: string): Promise<numb
   const targets = (await sql`
     SELECT endpoint, p256dh, auth FROM push_subscriptions
   `) as PushTarget[];
-  return sendTo(targets, { title, body, url });
+  return (await sendTo(targets, { title, body, url })).sent;
 }
 
 /**
@@ -273,7 +300,7 @@ export async function sendReadyNotice(
     WHERE clerk_user_id = ${request.guest_clerk_id}
   `) as PushTarget[];
 
-  return sendTo(targets, {
+  const { sent } = await sendTo(targets, {
     ...notice,
     // 催促は毎回別の tag にする。同じ tag だと、前の知らせを静かに置き換えるだけで
     // 鳴らない端末がある。
@@ -282,6 +309,7 @@ export async function sendReadyNotice(
     requireInteraction: true,
     vibrate: READY_VIBRATION,
   });
+  return sent;
 }
 
 /**
@@ -319,7 +347,7 @@ export async function sendDeliveredNotice(requestId: number): Promise<number> {
     SELECT endpoint, p256dh, auth FROM push_subscriptions
     WHERE clerk_user_id = ${request.guest_clerk_id}
   `) as PushTarget[];
-  return sendTo(targets, { ...notice, tag: `delivered-${requestId}` });
+  return (await sendTo(targets, { ...notice, tag: `delivered-${requestId}` })).sent;
 }
 
 /**
@@ -352,7 +380,7 @@ export async function sendNewRequestNotice(requestId: number): Promise<number> {
     WHERE clerk_user_id = ${request.clerk_user_id}
   `) as PushTarget[];
 
-  return sendTo(targets, {
+  const { sent } = await sendTo(targets, {
     title: '新しいリクエスト',
     body: `「${request.brand}」${request.cups} 杯 ・ ${request.guest_label}`,
     url: '/brewery',
@@ -361,6 +389,7 @@ export async function sendNewRequestNotice(requestId: number): Promise<number> {
     requireInteraction: true,
     vibrate: NEW_REQUEST_VIBRATION,
   });
+  return sent;
 }
 
 /**
@@ -384,12 +413,13 @@ export async function sendMessageNotice(noticeId: number): Promise<number> {
     SELECT endpoint, p256dh, auth FROM push_subscriptions WHERE role = ANY(${roles}::text[])
   `) as PushTarget[];
 
-  return sendTo(targets, {
+  const { sent } = await sendTo(targets, {
     title: `主催者より：${notice.title}`,
     body: notice.body,
     url: '/',
     tag: `message-${noticeId}`,
   });
+  return sent;
 }
 
 /**
