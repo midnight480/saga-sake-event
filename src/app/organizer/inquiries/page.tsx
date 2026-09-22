@@ -3,6 +3,7 @@
 import { useEffect, useState, useTransition } from 'react';
 
 import { fetchInquiries, replyToInquiry } from '@/app/actions';
+import { BroadcastComposer } from '@/components/BroadcastComposer';
 import {
   Button,
   Card,
@@ -11,13 +12,20 @@ import {
   Note,
   Notice,
   ScreenHeader,
+  SectionLabel,
   Title,
   inputClass,
 } from '@/components/ui';
 import { MAX_INQUIRY_BODY, countChars, type Inquiry } from '@/lib/domain';
 import { useSnapshot } from '@/lib/useSnapshot';
 
-/** 蔵と参加者から届いた問い合わせ。未回答が先に並ぶ。 */
+/**
+ * 連絡。全員へのお知らせの配信（Issue #54）と、蔵・参加者からの問い合わせ。
+ *
+ * 配信のために 8 つ目のタブを足すと、幅 320px で 1 つ 40px になり、指で押せる
+ * 大きさ（44px）を割る。どちらも「主催者と蔵・参加者のやり取り」なので、
+ * 問い合わせのタブにまとめ、名前を「連絡」にした。問い合わせは未回答が先に並ぶ。
+ */
 export default function InquiriesPage() {
   const { snapshot } = useSnapshot();
   const [rows, setRows] = useState<Inquiry[] | null>(null);
@@ -38,8 +46,8 @@ export default function InquiriesPage() {
   return (
     <>
       <ScreenHeader>
-        <Eyebrow>INQUIRIES</Eyebrow>
-        <Title>問い合わせ</Title>
+        <Eyebrow>MESSAGES</Eyebrow>
+        <Title>連絡</Title>
         <div className="mt-2">
           <Note>
             {open > 0
@@ -49,7 +57,13 @@ export default function InquiriesPage() {
         </div>
       </ScreenHeader>
 
-      <div className="flex flex-col gap-3 px-5 py-4">
+      <SectionLabel>全員へのお知らせ</SectionLabel>
+      <div className="px-5">
+        <BroadcastComposer />
+      </div>
+
+      <SectionLabel>問い合わせ</SectionLabel>
+      <div className="flex flex-col gap-3 px-5 pb-4">
         {pending && !rows && <Empty>読み込んでいます…</Empty>}
         {rows?.length === 0 && (
           <Empty>

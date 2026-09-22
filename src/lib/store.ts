@@ -13,8 +13,12 @@ import { randomInt } from 'node:crypto';
 
 import { getSql } from './db';
 import { ensureSchema } from './schema';
+import type { Role } from './auth';
 import {
   CUPS_PER_BOTTLE,
+  MAX_MESSAGE_BODY,
+  MAX_MESSAGE_TITLE,
+  MESSAGE_AUDIENCES,
   MAX_ITEM_DESCRIPTION,
   SAKE_RICHNESS,
   SAKE_SWEETNESS,
@@ -28,10 +32,13 @@ import {
   type GuestKind,
   type Guest,
   type Item,
+  type MessageAudience,
+  type MessageRecipients,
   type Notice,
   type NoticeKind,
   type OrderRequest,
   type RequestStatus,
+  type SentMessage,
   type Inquiry,
   type TicketBatch,
 } from './domain';
@@ -1233,7 +1240,7 @@ export async function getSnapshot(scope: SnapshotScope): Promise<Snapshot> {
       countWaitingByBrewery(),
       organizer ? listTicketBatches() : Promise.resolve([] as TicketBatch[]),
       organizer ? countOpenInquiries() : Promise.resolve(0),
-      countUnreadNotices(scope.userId),
+      countUnreadNotices(scope.userId, scope.role),
     ]);
 
   return {
@@ -1255,18 +1262,32 @@ export async function getSnapshot(scope: SnapshotScope): Promise<Snapshot> {
 // ─────────────────────────────────────────────────────────────
 // お知らせの履歴（右上の 🔔）
 //
-// 見えるのは「自分あて」と「全員あて（clerk_user_id が NULL）」。
+// 見えるのは「自分あて」と、宛先が空（clerk_user_id が NULL）のうち
+// 自分の役割に向けたもの（audience）。
+//   all           … 主催者も含む全員（節目のお知らせ）
+//   brewery/guest … 全酒蔵 / 全参加者（主催者からの配信、Issue #54）
+//   brewery+guest … 酒蔵と参加者の両方（送った主催者には出さない）
 // 読んだかどうかは notice_reads に人ごとに 1 行。全員あての 1 件でも、
 // 読んだ人と読んでいない人がいるので、お知らせ側には持たせない。
+//
+// ★ 見える条件は 4 つの関数で同じにすること ★
+// 数える・並べる・既読にするで条件がずれると、未読の数と一覧が合わなくなったり、
+// 見えないお知らせを既読にできたりする。
 // ─────────────────────────────────────────────────────────────
 
 /** まだ読んでいない件数。画面が数秒ごとに取りに来るので、1 本の SQL で数える。 */
-export async function countUnreadNotices(clerkUserId: string): Promise<number> {
+export async function countUnreadNotices(clerkUserId: string, role: Role): Promise<number> {
   const sql = await db();
   const rows = (await sql`
     SELECT count(*)::int AS n
     FROM notices n
-    WHERE (n.clerk_user_id = ${clerkUserId} OR n.clerk_user_id IS NULL)
+    WHERE (
+        n.clerk_user_id = ${clerkUserId}
+        OR (n.clerk_user_id IS NULL AND (
+          n.audience = 'all' OR n.audience = ${role}
+          OR (n.audience = 'brewery+guest' AND ${role} IN ('brewery', 'guest'))
+        ))
+      )
       AND NOT EXISTS (
         SELECT 1 FROM notice_reads r
         WHERE r.notice_id = n.id AND r.clerk_user_id = ${clerkUserId}
@@ -1276,14 +1297,18 @@ export async function countUnreadNotices(clerkUserId: string): Promise<number> {
 }
 
 /** 新しい順に。多すぎると 🔔 の中が読めなくなるので、直近の分だけ。 */
-export async function listNotices(clerkUserId: string, limit = 50): Promise<Notice[]> {
+export async function listNotices(clerkUserId: string, role: Role, limit = 50): Promise<Notice[]> {
   const sql = await db();
   const rows = (await sql`
     SELECT n.id, n.kind, n.title, n.body, n.url, n.created_at,
            (r.notice_id IS NOT NULL) AS read
     FROM notices n
     LEFT JOIN notice_reads r ON r.notice_id = n.id AND r.clerk_user_id = ${clerkUserId}
-    WHERE n.clerk_user_id = ${clerkUserId} OR n.clerk_user_id IS NULL
+    WHERE n.clerk_user_id = ${clerkUserId}
+       OR (n.clerk_user_id IS NULL AND (
+         n.audience = 'all' OR n.audience = ${role}
+         OR (n.audience = 'brewery+guest' AND ${role} IN ('brewery', 'guest'))
+       ))
     ORDER BY n.created_at DESC, n.id DESC
     LIMIT ${limit}
   `) as {
@@ -1309,31 +1334,127 @@ export async function listNotices(clerkUserId: string, limit = 50): Promise<Noti
 /**
  * 1 件を読んだことにする。
  *
- * 見えるお知らせ（自分あて・全員あて）のときだけ記録を作る。ほかの人あての
- * id を渡されても何も起きない。何度呼んでも 1 行のまま（ON CONFLICT）。
+ * 見えるお知らせのときだけ記録を作る。ほかの人あて・ほかの役割あての id を
+ * 渡されても何も起きない。何度呼んでも 1 行のまま（ON CONFLICT）。
  */
-export async function markNoticeRead(clerkUserId: string, noticeId: number): Promise<void> {
+export async function markNoticeRead(clerkUserId: string, role: Role, noticeId: number): Promise<void> {
   const sql = await db();
   await sql`
     INSERT INTO notice_reads (notice_id, clerk_user_id)
     SELECT n.id, ${clerkUserId}
     FROM notices n
     WHERE n.id = ${noticeId}
-      AND (n.clerk_user_id = ${clerkUserId} OR n.clerk_user_id IS NULL)
+      AND (
+        n.clerk_user_id = ${clerkUserId}
+        OR (n.clerk_user_id IS NULL AND (
+          n.audience = 'all' OR n.audience = ${role}
+          OR (n.audience = 'brewery+guest' AND ${role} IN ('brewery', 'guest'))
+        ))
+      )
     ON CONFLICT (notice_id, clerk_user_id) DO NOTHING
   `;
 }
 
 /** 見えているものを全部、読んだことにする。新しく既読にした件数を返す。 */
-export async function markAllNoticesRead(clerkUserId: string): Promise<number> {
+export async function markAllNoticesRead(clerkUserId: string, role: Role): Promise<number> {
   const sql = await db();
   const rows = (await sql`
     INSERT INTO notice_reads (notice_id, clerk_user_id)
     SELECT n.id, ${clerkUserId}
     FROM notices n
-    WHERE n.clerk_user_id = ${clerkUserId} OR n.clerk_user_id IS NULL
+    WHERE n.clerk_user_id = ${clerkUserId}
+       OR (n.clerk_user_id IS NULL AND (
+         n.audience = 'all' OR n.audience = ${role}
+         OR (n.audience = 'brewery+guest' AND ${role} IN ('brewery', 'guest'))
+       ))
     ON CONFLICT (notice_id, clerk_user_id) DO NOTHING
     RETURNING notice_id
   `) as unknown[];
   return rows.length;
+}
+
+// ─────────────────────────────────────────────────────────────
+// 主催者からの配信（Issue #54）
+//
+// 全酒蔵・全参加者（またはその両方）にだけ送る。個別あては作らない。
+// 宛先の人の 🔔 に残り、未読・既読は上の仕組みでそのまま人ごとに管理される。
+// ─────────────────────────────────────────────────────────────
+
+/** 配信する。お知らせの id を返す（スマホの通知を送るのに使う）。 */
+export async function broadcastMessage(input: {
+  audience: string;
+  title: string;
+  body: string;
+}): Promise<Result<{ id: number }>> {
+  const audience = MESSAGE_AUDIENCES.find((a) => a.value === input.audience)?.value;
+  if (!audience) return fail('宛先を選んでください。');
+
+  const title = input.title.trim();
+  const body = input.body.replace(/\r\n?/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
+  if (!title) return fail('件名を入力してください。');
+  if (!body) return fail('本文を入力してください。');
+  if (countChars(title) > MAX_MESSAGE_TITLE) {
+    return fail(`件名は ${MAX_MESSAGE_TITLE} 文字までです（いま ${countChars(title)} 文字）。`);
+  }
+  if (countChars(body) > MAX_MESSAGE_BODY) {
+    return fail(`本文は ${MAX_MESSAGE_BODY} 文字までです（いま ${countChars(body)} 文字）。`);
+  }
+
+  const sql = await db();
+  const rows = (await sql`
+    INSERT INTO notices (clerk_user_id, kind, title, body, url, audience)
+    VALUES (NULL, 'message', ${title}, ${body}, '/', ${audience})
+    RETURNING id
+  `) as { id: number | string }[];
+  return ok({ id: Number(rows[0].id) });
+}
+
+/** 送ったお知らせを新しい順に。配信画面で「送ったもの」として見せる。 */
+export async function listSentMessages(limit = 30): Promise<SentMessage[]> {
+  const sql = await db();
+  const rows = (await sql`
+    SELECT id, audience, title, body, created_at
+    FROM notices
+    WHERE kind = 'message'
+    ORDER BY created_at DESC, id DESC
+    LIMIT ${limit}
+  `) as {
+    id: number | string;
+    audience: MessageAudience;
+    title: string;
+    body: string;
+    created_at: string | Date;
+  }[];
+  return rows.map((r) => ({
+    id: Number(r.id),
+    audience: r.audience,
+    title: r.title,
+    body: r.body,
+    createdAt: new Date(r.created_at).toISOString(),
+  }));
+}
+
+/**
+ * 配信の確認画面に出す、届く相手の数。
+ * 蔵はログイン用のアカウントがある蔵だけを数える（無い蔵は誰も見られない）。
+ */
+export async function countMessageRecipients(): Promise<Record<MessageAudience, MessageRecipients>> {
+  const sql = await db();
+  const rows = (await sql`
+    SELECT
+      (SELECT count(*)::int FROM breweries WHERE clerk_user_id IS NOT NULL) AS breweries,
+      (SELECT count(*)::int FROM guests) AS guests,
+      (SELECT count(*)::int FROM push_subscriptions WHERE role = 'brewery') AS brewery_devices,
+      (SELECT count(*)::int FROM push_subscriptions WHERE role = 'guest') AS guest_devices
+  `) as { breweries: number; guests: number; brewery_devices: number; guest_devices: number }[];
+  const r = rows[0];
+  return {
+    brewery: { breweries: r.breweries, guests: 0, devices: r.brewery_devices },
+    guest: { breweries: 0, guests: r.guests, devices: r.guest_devices },
+    'brewery+guest': {
+      breweries: r.breweries,
+      guests: r.guests,
+      devices: r.brewery_devices + r.guest_devices,
+    },
+  };
 }

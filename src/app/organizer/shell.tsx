@@ -22,7 +22,8 @@ const TABS: Tab[] = [
   { href: '/organizer/event', label: '設定', icon: '⚙' },
   { href: '/organizer/breweries', label: '酒蔵', icon: '◈' },
   { href: '/organizer/tickets', label: 'チケット', icon: '▦' },
-  { href: '/organizer/inquiries', label: '問合せ', icon: '✉' },
+  // 問い合わせと、全員へのお知らせの配信（Issue #54）をまとめたタブ。
+  { href: '/organizer/inquiries', label: '連絡', icon: '✉' },
   { href: '/organizer/help', label: 'ヘルプ', icon: '？' },
 ];
 
