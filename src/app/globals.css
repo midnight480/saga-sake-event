@@ -140,7 +140,50 @@ a:hover {
   animation: riseIn 0.3s ease;
 }
 
+/* ─── 券の読み取りの手ごたえ（Issue #57）───
+   成功: 画面の左右の下から、クラッカーのように紙ふぶきが飛び出す。
+   失敗: 画面を小刻みに揺らす。
+   読み取れたのか分からない、を無くすため。音（sound.ts）と一緒に使う。 */
+@keyframes confettiBurst {
+  0% {
+    transform: translate(0, 0) rotate(0deg) scale(0.6);
+    opacity: 1;
+  }
+  55% {
+    transform: translate(var(--dx), var(--dy)) rotate(var(--rot)) scale(1);
+    opacity: 1;
+  }
+  100% {
+    /* 頂点まで飛んだあと、ひらひら落ちながら消える。 */
+    transform: translate(var(--dx), calc(var(--dy) + 140px)) rotate(calc(var(--rot) * 2)) scale(1);
+    opacity: 0;
+  }
+}
+.confetti-piece {
+  position: absolute;
+  bottom: -12px;
+  animation: confettiBurst var(--dur, 1.6s) cubic-bezier(0.18, 0.7, 0.3, 1) var(--delay, 0s) both;
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  15%, 55% { transform: translateX(-10px); }
+  35%, 75% { transform: translateX(10px); }
+  90% { transform: translateX(-4px); }
+}
+.shake {
+  animation: shake 0.5s ease-in-out both;
+}
+
 @media (prefers-reduced-motion: reduce) {
+  /* 動きを減らす設定の人には、紙ふぶきも揺れも出さない。結果の文字と音で伝える。
+     揺らす対象は画面そのものなので、隠さず動きだけを止める。 */
+  .confetti-piece {
+    display: none;
+  }
+  .shake {
+    animation: none;
+  }
   .pulse-dot,
   .rise-in {
     animation: none;

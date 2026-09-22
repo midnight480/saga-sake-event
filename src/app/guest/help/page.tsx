@@ -29,6 +29,7 @@ export default function GuestHelpPage() {
         />
         <HelpNote>
           コードは 1 枚につき一度だけ使えます。読み取ったあとの券は、記念にお持ち帰りください。
+          読み取れると明るい音と紙ふぶき、読み取れないと低い音が鳴って画面が揺れます。
         </HelpNote>
       </HelpSection>
 
@@ -52,6 +53,8 @@ export default function GuestHelpPage() {
             </>,
             <>
               「ブースで受け取ってください」と出たら、その蔵まで取りに行ってください。
+              できあがると、音と振動が鳴り、画面の下に帯が出ます（🔔 にも残ります）。
+              音と振動は、マイページの「できあがりの知らせ方」で切り替えられます。
             </>,
             <>
               <strong className="text-ink">受け取ってから、次のリクエストを出せます。</strong>

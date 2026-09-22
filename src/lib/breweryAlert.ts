@@ -20,127 +20,59 @@ export interface AlertPrefs {
   keepAwake: boolean;
 }
 
-const KEY = 'saga-sake-event:brewery-alert';
+/**
+ * 誰の設定か。蔵（新しいリクエスト、#51）と参加者（できあがり、#58）で分けて覚える。
+ * 同じ端末で両方を使うことはまず無いが、意味の違う設定を 1 つにまとめない。
+ */
+export type AlertScope = 'brewery' | 'guest';
+
+const KEYS: Record<AlertScope, string> = {
+  brewery: 'saga-sake-event:brewery-alert',
+  guest: 'saga-sake-event:guest-alert',
+};
 const DEFAULTS: AlertPrefs = { sound: true, vibrate: true, keepAwake: false };
 
-let current: AlertPrefs = DEFAULTS;
-let loaded = false;
+const current: Record<AlertScope, AlertPrefs> = { brewery: DEFAULTS, guest: DEFAULTS };
+const loaded: Record<AlertScope, boolean> = { brewery: false, guest: false };
 const listeners = new Set<() => void>();
 
-function load(): AlertPrefs {
-  if (loaded) return current;
-  loaded = true;
+function load(scope: AlertScope): AlertPrefs {
+  if (loaded[scope]) return current[scope];
+  loaded[scope] = true;
   try {
-    const raw = window.localStorage.getItem(KEY);
-    if (raw) current = { ...DEFAULTS, ...(JSON.parse(raw) as Partial<AlertPrefs>) };
+    const raw = window.localStorage.getItem(KEYS[scope]);
+    if (raw) current[scope] = { ...DEFAULTS, ...(JSON.parse(raw) as Partial<AlertPrefs>) };
   } catch {
     // 読めなくても既定値で動く。
   }
-  return current;
+  return current[scope];
 }
 
-export function setAlertPrefs(patch: Partial<AlertPrefs>): void {
-  current = { ...load(), ...patch };
+export function setAlertPrefs(patch: Partial<AlertPrefs>, scope: AlertScope = 'brewery'): void {
+  current[scope] = { ...load(scope), ...patch };
   try {
-    window.localStorage.setItem(KEY, JSON.stringify(current));
+    window.localStorage.setItem(KEYS[scope], JSON.stringify(current[scope]));
   } catch {
     // 覚えられなくても、この画面を開いている間は効く。
   }
   listeners.forEach((fn) => fn());
 }
 
-/** 設定を読む。受付キューの設定欄と、画面全体の知らせる係で同じものを見る。 */
-export function useAlertPrefs(): AlertPrefs {
+/** 設定を読む。設定欄と、画面全体の知らせる係で同じものを見る。 */
+export function useAlertPrefs(scope: AlertScope = 'brewery'): AlertPrefs {
   return useSyncExternalStore(
     (fn) => {
       listeners.add(fn);
       return () => listeners.delete(fn);
     },
-    () => (typeof window === 'undefined' ? DEFAULTS : load()),
+    () => (typeof window === 'undefined' ? DEFAULTS : load(scope)),
     () => DEFAULTS,
   );
 }
 
-// ─────────────────────────────────────────────────────────────
-// 音
-//
-// ブラウザは、人が画面に触れる前に音を鳴らさせてくれない。そこで
-// ・設定で「音」を押したときに試し音を鳴らす（その 1 回で鳴る状態になる）
-// ・画面を開き直したあとは、どこか一度触れた時点で鳴る状態に戻す
-// の 2 つで、当日の最初の 1 件から鳴るようにしている。
-// iPhone は本体の消音スイッチが入っていると鳴らない（ブラウザからは変えられない）。
-// ─────────────────────────────────────────────────────────────
-
-let audio: AudioContext | null = null;
-
-function context(): AudioContext | null {
-  if (typeof window === 'undefined') return null;
-  if (!audio) {
-    const Ctor =
-      window.AudioContext ??
-      (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-    if (!Ctor) return null;
-    audio = new Ctor();
-  }
-  return audio;
-}
-
-/** 音を鳴らせる状態か。触れる前は false。 */
-export function soundReady(): boolean {
-  return audio?.state === 'running';
-}
-
-/** 人が画面に触れたときに呼ぶ。ここで初めて音を鳴らせる状態になる。 */
-export async function unlockSound(): Promise<boolean> {
-  const ctx = context();
-  if (!ctx) return false;
-  if (ctx.state !== 'running') {
-    try {
-      await ctx.resume();
-    } catch {
-      return false;
-    }
-  }
-  return ctx.state === 'running';
-}
-
-/**
- * 「ピッ・ポーン」と 2 回鳴らす。
- *
- * 会場はにぎやかなので、高めの音を 2 つ続けて耳に残るようにする。
- * 音源のファイルは持たない（読み込みに失敗して鳴らない、を避けるため）。
- */
-export function playChime(): void {
-  const ctx = context();
-  if (!ctx || ctx.state !== 'running') return;
-  const tone = (freq: number, start: number, length: number) => {
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = 'sine';
-    osc.frequency.value = freq;
-    // いきなり鳴らすとプツッと雑音が入るので、音量を滑らかに上げ下げする。
-    gain.gain.setValueAtTime(0.0001, ctx.currentTime + start);
-    gain.gain.exponentialRampToValueAtTime(0.6, ctx.currentTime + start + 0.02);
-    gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + start + length);
-    osc.connect(gain).connect(ctx.destination);
-    osc.start(ctx.currentTime + start);
-    osc.stop(ctx.currentTime + start + length + 0.02);
-  };
-  tone(988, 0, 0.18); // シ
-  tone(1319, 0.2, 0.32); // ミ
-}
-
-// ─────────────────────────────────────────────────────────────
-// 振動（Android のみ。iPhone のブラウザは振動に対応していない）
-// ─────────────────────────────────────────────────────────────
-
-export function canVibrate(): boolean {
-  return typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function';
-}
-
-export function vibrate(): void {
-  if (canVibrate()) navigator.vibrate([220, 120, 220]);
-}
+// 音と振動は sound.ts に置いた（参加者の画面・券の読み取りでも使うため）。
+// これまでの呼び出し元が変わらないよう、ここからも渡す。
+export { canVibrate, playChime, soundReady, unlockSound, vibrate } from './sound';
 
 // ─────────────────────────────────────────────────────────────
 // 画面を消さない（Screen Wake Lock）

@@ -136,6 +136,12 @@ interface NoticePayload {
 export const NEW_REQUEST_VIBRATION = [500, 200, 500, 200, 900];
 
 /**
+ * 参加者に「できあがり」を知らせるときの振動（Issue #58）。
+ * 蔵への新着とは別の形（短く 3 回のあと長く 1 回）にして、端末を見なくても区別できるように。
+ */
+export const READY_VIBRATION = [250, 120, 250, 120, 250, 120, 700];
+
+/**
  * 決まった宛先に送る。
  * 宛先が無効になっていたら（端末が消えた、許可を取り消した）その行を消す。
  */
@@ -222,7 +228,13 @@ export async function sendReadyNotice(requestId: number): Promise<number> {
     WHERE clerk_user_id = ${request.guest_clerk_id}
   `) as PushTarget[];
 
-  return sendTo(targets, { ...notice, tag: `ready-${requestId}` });
+  return sendTo(targets, {
+    ...notice,
+    tag: `ready-${requestId}`,
+    // 取りに行く合図なので見逃さないよう、消えずに残し、長めの振動にする（Issue #58）。
+    requireInteraction: true,
+    vibrate: READY_VIBRATION,
+  });
 }
 
 /**
