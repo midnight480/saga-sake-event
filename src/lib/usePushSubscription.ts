@@ -3,9 +3,16 @@
 import { useEffect, useState, useTransition } from 'react';
 
 import { getPushPublicKey, subscribeToPush, unsubscribeFromPush } from '@/app/actions';
-import { isInstalled, isIos, registerServiceWorker, urlBase64ToUint8Array } from '@/lib/pwa';
+import { pushSupport, registerServiceWorker, urlBase64ToUint8Array } from '@/lib/pwa';
 
-export type PushState = 'loading' | 'unsupported' | 'need-install' | 'off' | 'on' | 'denied';
+export type PushState =
+  | 'loading'
+  | 'unsupported'
+  | 'need-install'
+  | 'ios-too-old'
+  | 'off'
+  | 'on'
+  | 'denied';
 
 /**
  * この端末でお知らせを受け取るかどうか。
@@ -21,13 +28,10 @@ export function usePushSubscription() {
   useEffect(() => {
     (async () => {
       if (typeof window === 'undefined') return;
-      if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
-        setState('unsupported');
-        return;
-      }
-      // iPhone はホーム画面に追加していないと、許可を出すことすらできない。
-      if (isIos() && !isInstalled()) {
-        setState('need-install');
+      // iPhone かどうかを先に見る（順番の理由は pwa.ts の pushSupport）。
+      const support = pushSupport();
+      if (support !== 'ok') {
+        setState(support);
         return;
       }
       if (Notification.permission === 'denied') {

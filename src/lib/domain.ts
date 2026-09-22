@@ -673,3 +673,134 @@ export interface Notice {
   createdAt: string; // ISO
   read: boolean;
 }
+
+// ─────────────────────────────────────────────────────────────
+// 蔵に知らせる新しいリクエスト（Issue #51）
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * 前回までに見ていない「受付済」の注文を返し、見たものとして覚える。
+ *
+ * seen が null（画面を開いた直後）のときは、いまある注文を覚えるだけで何も返さない。
+ * 開き直すたびに鳴ると、どれが新しいのか分からなくなるため。
+ * 受付済のものだけを見る。準備中などに進んだものは、もう蔵が手を付けている。
+ */
+export function takeNewRequests(
+  seen: Set<number> | null,
+  requests: OrderRequest[],
+  breweryId: string,
+): { seen: Set<number>; arrived: OrderRequest[] } {
+  const accepted = requests.filter((r) => r.breweryId === breweryId && r.status === 'accepted');
+  if (seen === null) return { seen: new Set(accepted.map((r) => r.id)), arrived: [] };
+  const arrived = accepted.filter((r) => !seen.has(r.id));
+  const next = new Set(seen);
+  arrived.forEach((r) => next.add(r.id));
+  return { seen: next, arrived };
+}
+
+// ─────────────────────────────────────────────────────────────
+// 称号（Issue #52）
+//
+// 記録を見るたびに少しずつ上がっていく楽しみを作る。SNS に載せてもらうことも
+// 考え、飲む量ではなく「どれだけ多くの銘柄と出会ったか」を称える言葉にした。
+// 泥酔・酩酊のような、飲み過ぎを勧める言葉は使わない。
+//
+// 数えるのは受渡完了だけ（conquestOf と同じ）。頼んだだけでは上がらない。
+// ─────────────────────────────────────────────────────────────
+
+export interface Rank {
+  name: string;
+  /** 読みがな。読みにくい称号だけ。 */
+  reading?: string;
+  description: string;
+}
+
+/**
+ * 段の区切りは「受け取った銘柄の数」で決める。
+ * 割合にしなかったのは、蔵が 30 あると 1 人で 2 割を飲むのは現実的でなく、
+ * ほとんどの人がずっと最初の段のままになるため。
+ */
+export const RANKS: (Rank & { atLeast: number })[] = [
+  { atLeast: 0, name: '素面', reading: 'しらふ', description: 'まだ一杯目の前。最初の一杯をどうぞ。' },
+  { atLeast: 1, name: 'ほろ酔い', description: '佐賀の酒に、はじめまして。' },
+  { atLeast: 3, name: '一杯機嫌', reading: 'いっぱいきげん', description: '味の違いが分かってきたころ。' },
+  { atLeast: 5, name: '上機嫌', description: '蔵めぐりが楽しくなってきた。' },
+  { atLeast: 8, name: '酒通', reading: 'さけつう', description: '好みの一本を語れる。' },
+  { atLeast: 12, name: '酒豪', description: 'まだまだ出会いを求める、頼もしい飲み手。' },
+  { atLeast: 20, name: '酒仙', reading: 'しゅせん', description: '酒を友とする境地。' },
+];
+
+/** すべての蔵のすべての銘柄を飲み干したときだけの、いちばん上の称号。 */
+export const TOP_RANK: Rank = {
+  name: '酒呑童子',
+  reading: 'しゅてんどうじ',
+  description: 'すべての蔵の、すべての銘柄を飲み干した伝説の酒呑み。',
+};
+
+export interface SpecialTitle {
+  id: 'kura-master' | 'kura-meguri';
+  name: string;
+  reading?: string;
+  description: string;
+  earned: boolean;
+  /** 取れていれば、どの蔵で取れたか。取れていなければ、あと何をすればよいか。 */
+  detail: string;
+}
+
+export interface TitleStatus {
+  rank: Rank;
+  /** 次の称号と、そこまでの残り銘柄数。いちばん上なら null。 */
+  next: { rank: Rank; remaining: number } | null;
+  specials: SpecialTitle[];
+}
+
+export function titleOf(conquest: Conquest): TitleStatus {
+  const { itemsConquered, itemsTotal, breweries } = conquest;
+  const complete = itemsTotal > 0 && itemsConquered === itemsTotal;
+
+  // 全銘柄の数以上の区切りは、全部飲むまで届かない。その段は飛ばし、
+  // 全部飲んだら酒呑童子にする（途中の段と重なったら、酒呑童子を優先）。
+  const reachable = RANKS.filter((r) => r.atLeast === 0 || r.atLeast < itemsTotal);
+  const current = [...reachable].reverse().find((r) => itemsConquered >= r.atLeast) ?? RANKS[0];
+  const upcoming = reachable.find((r) => r.atLeast > itemsConquered);
+
+  const rank: Rank = complete ? TOP_RANK : current;
+  const next = complete
+    ? null
+    : upcoming
+      ? { rank: upcoming, remaining: upcoming.atLeast - itemsConquered }
+      : itemsTotal > 0
+        ? { rank: TOP_RANK, remaining: itemsTotal - itemsConquered }
+        : null;
+
+  // ── 特別な称号。蔵が 1 つも無いときは、どちらも取れない（空の「全部」を満たさない）。──
+  const mastered = breweries.filter((b) => b.items.length > 0 && b.conquered === b.items.length);
+  const unvisited = breweries.filter((b) => b.conquered === 0);
+  const hasBreweries = breweries.length > 0;
+
+  const specials: SpecialTitle[] = [
+    {
+      id: 'kura-master',
+      name: '蔵の主',
+      reading: 'くらのぬし',
+      description: 'ひとつの蔵の、すべての銘柄を飲んだ。',
+      earned: mastered.length > 0,
+      detail:
+        mastered.length > 0
+          ? mastered.map((b) => b.brewery.name).join('、')
+          : 'どこか 1 つの蔵で、全部の銘柄を',
+    },
+    {
+      id: 'kura-meguri',
+      name: '蔵めぐり名人',
+      description: 'すべての蔵で、1 銘柄以上を飲んだ。',
+      earned: hasBreweries && unvisited.length === 0,
+      detail:
+        hasBreweries && unvisited.length === 0
+          ? `${breweries.length} 蔵すべて`
+          : `あと ${unvisited.length} 蔵`,
+    },
+  ];
+
+  return { rank, next, specials };
+}

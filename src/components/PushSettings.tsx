@@ -1,6 +1,7 @@
 'use client';
 
 import { Button, Card, Notice } from '@/components/ui';
+import { AddToHomeSteps } from '@/components/AddToHomeSteps';
 import { HelpSection, HelpText } from '@/components/Help';
 import { MILESTONES } from '@/lib/domain';
 import { usePushSubscription } from '@/lib/usePushSubscription';
@@ -33,14 +34,27 @@ export function PushSettings({ extraReasons = [] }: { extraReasons?: string[] })
 
       {state === 'unsupported' && (
         <Notice tone="info">
-          このブラウザではお知らせを使えません。Safari か Chrome の新しい版でお試しください。
+          このブラウザではお知らせを受け取れません。Android のスマートフォンなら Chrome で
+          開いてください。
         </Notice>
       )}
 
       {state === 'need-install' && (
-        <Notice tone="warn" title="先にホーム画面に追加してください">
-          iPhone では、ホーム画面に追加したうえで開かないと、お知らせを受け取れません。
-          画面下の「共有」→「ホーム画面に追加」から追加して、そのアイコンから開き直してください。
+        <>
+          <Notice tone="warn" title="先にホーム画面に追加してください">
+            iPhone では、Safari でも Chrome でも、ホーム画面に追加して
+            <strong className="font-bold text-ink">そのアイコンから開いたとき</strong>
+            だけ、お知らせを受け取れます。ブラウザが古いわけではありません。
+          </Notice>
+          <AddToHomeSteps />
+          <HelpText>追加したら、ホーム画面のアイコンから開き直して、この欄をもう一度見てください。</HelpText>
+        </>
+      )}
+
+      {state === 'ios-too-old' && (
+        <Notice tone="warn" title="iOS の更新が必要です">
+          iPhone でお知らせを受け取るには、iOS 16.4 以降が必要です。「設定」→「一般」→
+          「ソフトウェアアップデート」から更新できます。
         </Notice>
       )}
 

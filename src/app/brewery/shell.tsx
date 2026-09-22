@@ -3,6 +3,7 @@
 import { createContext, useContext } from 'react';
 
 import { AppShell, type LogoutOptions, type Tab } from '@/components/AppShell';
+import { NewRequestAlert } from '@/components/NewRequestAlert';
 import { orderingStatus } from '@/lib/domain';
 import { useSnapshot } from '@/lib/useSnapshot';
 
@@ -87,6 +88,8 @@ export function BreweryShell({
           </div>
         )}
         {children}
+        {/* 新しいリクエストを音・振動・帯で知らせる（Issue #51）。代理で見ている主催者には鳴らさない。 */}
+        {!asOrganizer && <NewRequestAlert breweryId={breweryId} />}
       </AppShell>
     </BreweryContext.Provider>
   );

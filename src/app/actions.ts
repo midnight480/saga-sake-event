@@ -387,6 +387,20 @@ export async function order(itemId: string, cups: number): Promise<ActionResult<
 
     const result = await store.createRequest({ clerkUserId: viewer.userId, itemId, cups });
     refresh();
+
+    // 蔵のスマホに知らせる（Issue #51）。参加者の画面は待たせない。
+    if (result.ok) {
+      const requestId = result.value.id;
+      after(async () => {
+        try {
+          const { sendNewRequestNotice } = await import('@/lib/push');
+          await sendNewRequestNotice(requestId);
+        } catch (error) {
+          console.error('[push] 新しいリクエストの通知に失敗しました', error);
+        }
+      });
+    }
+
     return result.ok ? { ok: true, value: { spent: result.value.spent } } : { ok: false, reason: result.reason };
   });
 }

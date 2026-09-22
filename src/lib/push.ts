@@ -212,6 +212,44 @@ export async function sendReadyNotice(requestId: number): Promise<number> {
 }
 
 /**
+ * 新しいリクエストを、その蔵の端末に知らせる（Issue #51）。
+ *
+ * 蔵の担当者は注いだり渡したりで手がふさがっていて、画面を見ていないことが
+ * 多い。スマホをしまっていても気づけるよう、OS の通知でも送る（画面の側では
+ * 音・振動・帯でも知らせる。components/NewRequestAlert）。
+ *
+ * 🔔 の履歴には残さない。蔵にとってリクエストの履歴は受付キューそのもので、
+ * 1 件ごとに残すと未読の数が増え続けて、本当に見てほしいお知らせが埋もれる。
+ *
+ * 呼ぶのは注文が通ったときだけ（actions.ts の order）。1 回の注文で 1 回。
+ */
+export async function sendNewRequestNotice(requestId: number): Promise<number> {
+  const sql = await db();
+  const rows = (await sql`
+    SELECT r.brand, r.cups, r.guest_label, b.clerk_user_id
+    FROM requests r
+    JOIN breweries b ON b.id = r.brewery_id
+    WHERE r.id = ${requestId} AND r.status = 'accepted'
+  `) as { brand: string; cups: number; guest_label: string; clerk_user_id: string | null }[];
+
+  // 送る前に取り消された、蔵のアカウントがまだ無い、など。
+  const request = rows[0];
+  if (!request?.clerk_user_id) return 0;
+
+  const targets = (await sql`
+    SELECT endpoint, p256dh, auth FROM push_subscriptions
+    WHERE clerk_user_id = ${request.clerk_user_id}
+  `) as PushTarget[];
+
+  return sendTo(targets, {
+    title: '新しいリクエスト',
+    body: `「${request.brand}」${request.cups} 杯 ・ ${request.guest_label}`,
+    url: '/brewery',
+    tag: `request-${requestId}`,
+  });
+}
+
+/**
  * 節目を過ぎていれば送る。画面が現在値を取りに来るたびに呼ばれる。
  *
  * 送った記録を先に作り、作れたときだけ送る。開催日と節目の組を主キーに
