@@ -150,7 +150,8 @@ function Charge() {
       <ScreenHeader>
         <Title>ポイントを追加</Title>
         <p className="mt-2 text-[12px] leading-[1.7] text-ink-55">
-          お手持ちの券に書かれたコードを入れてください。前売券・当日券のどちらも、同じ残高に入ります。
+          お手持ちの券の QR をカメラで読み取るか、券に書かれたコードを入れてください。
+          前売券・当日券のどちらも、同じ残高に入ります。
           一度使ったコードは、二度は使えません。
         </p>
         {guest && (
@@ -188,10 +189,20 @@ function Charge() {
           </div>
         )}
 
+        {/*
+          読み取り枠を上、コードの入力を下に置く（Issue #75）。以前は入力欄が上で、
+          カメラは畳んだ中にあり、スマホでは枠が画面の下に見切れていた。券には QR が
+          付いているので、まず枠を見せる。開いた時点で枠が見えていると、高齢の方でも
+          「ここに券をかざす」と分かる（Issue #74）。
+        */}
+        <Card>
+          <Scanner onDetect={submit} disabled={pending} />
+        </Card>
+
         <Card>
           <label className="flex flex-col gap-2">
             <span className="text-[11.5px] leading-none tracking-[0.08em] text-ink-55">
-              券に書かれたコード
+              カメラが使えないときは、券に書かれたコードを入れてください
             </span>
             <input
               value={manualCode}
@@ -217,15 +228,6 @@ function Charge() {
             {pending ? '確認しています…' : 'ポイントを受け取る'}
           </Button>
         </Card>
-
-        <details className="rounded-card border border-hairline bg-card p-4">
-          <summary className="cursor-pointer text-[12.5px] text-ink-55">
-            券に QR が付いている場合は、カメラで読み取れます
-          </summary>
-          <div className="mt-3">
-            <Scanner onDetect={submit} disabled={pending} />
-          </div>
-        </details>
 
         <div className="flex flex-col gap-2.5">
           <div className="text-[11px] leading-none tracking-[0.2em] text-ink-45">読み取り履歴</div>
@@ -314,7 +316,8 @@ function Scanner({ onDetect, disabled }: { onDetect: (code: string) => void; dis
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="relative aspect-square overflow-hidden rounded-screen bg-well">
+      {/* 背の低い画面でも「カメラで読み取る」まで一度に見えるよう、高さに上限を付ける（Issue #75）。 */}
+      <div className="relative aspect-square max-h-[42svh] w-full overflow-hidden rounded-screen bg-well">
         <video
           ref={videoRef}
           // iOS Safari は playsInline が無いと全画面再生に切り替わってしまう。
@@ -359,14 +362,14 @@ function Scanner({ onDetect, disabled }: { onDetect: (code: string) => void; dis
                 <br />
                 ブラウザの設定で許可するか、
                 <br />
-                上の欄にコードを入力してください。
+                下の欄にコードを入力してください。
               </span>
             )}
             {state === 'unsupported' && (
               <span>
                 この端末ではカメラを使えませんでした。
                 <br />
-                上の欄にコードを入力してください。
+                下の欄にコードを入力してください。
               </span>
             )}
           </div>

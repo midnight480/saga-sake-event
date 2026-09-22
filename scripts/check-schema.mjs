@@ -410,6 +410,83 @@ async function main() {
   );
   check('二重キャンセルでチケットは増えない', (await ticketsOf()).tickets === 16);
 
+  // ── 参加者の「受け取りました」（Issue #72）──
+  console.log('\n■ 参加者の受け取り確認');
+  await seed({ bottles: 1, cupsPerBottle: 6, ticketCost: 1, tickets: 20 });
+  await addGuest('u2', 20);
+  const mine = await order('u1', 'i1', 2);
+  const confirm = `
+    WITH moved AS (
+      UPDATE requests SET status = 'delivered', updated_at = now()
+      WHERE id = $1 AND guest_clerk_id = $2 AND status = 'ready'
+      RETURNING item_id, cups
+    )
+    UPDATE items SET used_cups = used_cups + (SELECT cups FROM moved)
+    WHERE id = (SELECT item_id FROM moved) RETURNING id`;
+  const byBrewery = `
+    WITH moved AS (
+      UPDATE requests SET status = 'delivered', updated_at = now()
+      WHERE id = $1 AND status = 'ready' RETURNING item_id, cups
+    )
+    UPDATE items SET used_cups = used_cups + (SELECT cups FROM moved)
+    WHERE id = (SELECT item_id FROM moved) RETURNING id`;
+
+  const early = await pool.query(confirm, [mine.request_id, 'u1']);
+  check('できあがる前は、参加者は受け取りにできない', early.rows.length === 0);
+
+  await pool.query(`UPDATE requests SET status = 'ready' WHERE id = $1`, [mine.request_id]);
+  const other = await pool.query(confirm, [mine.request_id, 'u2']);
+  check('ほかの参加者の注文は、受け取りにできない', other.rows.length === 0);
+
+  // 参加者と蔵が同時に押す（参加者 4 回・蔵 4 回）
+  const mixed = await Promise.all(
+    Array.from({ length: 8 }, (_, i) =>
+      i % 2 === 0
+        ? pool.query(confirm, [mine.request_id, 'u1'])
+        : pool.query(byBrewery, [mine.request_id]),
+    ),
+  );
+  const passed = mixed.filter((r) => r.rows.length > 0).length;
+  check('参加者と蔵が同時に押しても、通るのは 1 回だけ', passed === 1, `通った回数=${passed}`);
+  const { rows: confirmedRows } = await pool.query(`SELECT used_cups FROM items WHERE id = 'i1'`);
+  check(
+    '在庫も 1 回ぶん（2 杯）しか減っていない',
+    confirmedRows[0].used_cups === 2,
+    `used_cups=${confirmedRows[0].used_cups}`,
+  );
+
+  // ── 取りに来ない人への催促（Issue #73）──
+  console.log('\n■ 催促');
+  const next = await order('u1', 'i1', 1);
+  const remind = `
+    UPDATE requests SET reminded_at = now()
+    WHERE id = $1 AND status = 'ready'
+      AND ($2::text IS NULL OR brewery_id = $2)
+      AND (reminded_at IS NULL OR reminded_at <= now() - make_interval(secs => $3))
+    RETURNING id`;
+  const notReady = await pool.query(remind, [next.request_id, 'b1', 60]);
+  check('準備完了でない注文は催促できない', notReady.rows.length === 0);
+
+  await pool.query(`UPDATE requests SET status = 'ready' WHERE id = $1`, [next.request_id]);
+  const otherBrewery = await pool.query(remind, [next.request_id, 'b-other', 60]);
+  check('ほかの蔵の注文は催促できない', otherBrewery.rows.length === 0);
+
+  const reminds = await Promise.all(
+    Array.from({ length: 6 }, () => pool.query(remind, [next.request_id, 'b1', 60])),
+  );
+  const remindPassed = reminds.filter((r) => r.rows.length > 0).length;
+  check('同時に 6 回押しても、催促は 1 回だけ', remindPassed === 1, `通った回数=${remindPassed}`);
+
+  const tooSoon = await pool.query(remind, [next.request_id, 'b1', 60]);
+  check('1 分たたないうちは、もう一度は送れない', tooSoon.rows.length === 0);
+
+  await pool.query(
+    `UPDATE requests SET reminded_at = now() - interval '61 seconds' WHERE id = $1`,
+    [next.request_id],
+  );
+  const later = await pool.query(remind, [next.request_id, null, 60]);
+  check('1 分たてば、また送れる（主催者は蔵を問わない）', later.rows.length === 1);
+
   // ── 券の消し込み ──
   console.log('\n■ 券の消し込み');
   await pool.query(`DELETE FROM tickets`);

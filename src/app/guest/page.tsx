@@ -11,6 +11,7 @@ import {
   Title,
 } from '@/components/ui';
 import { ReadyNoticePrompt } from '@/components/ReadyNoticePrompt';
+import { ReceiveButton } from '@/components/ReceiveButton';
 import { STATUS_MESSAGE, undeliveredRequestOf } from '@/lib/domain';
 import { useSnapshot } from '@/lib/useSnapshot';
 
@@ -53,6 +54,10 @@ export default function GuestHome() {
         >
           会場でポイントを追加する
         </Link>
+        {/* 何を押せば QR を読めるのか、迷わないように（Issue #74）。 */}
+        <p className="mt-2 text-center text-[11.5px] leading-none text-ink-45">
+          券の QR をカメラで読み取って追加します
+        </p>
       </header>
 
       {/* 受け取りを待っているときだけ、通知の案内を出す（Issue #35）。 */}
@@ -86,6 +91,8 @@ export default function GuestHome() {
                 <p className="border-t border-hairline pt-2.5 text-[12px] leading-[1.7] text-ink-70">
                   {STATUS_MESSAGE[request.status]}
                 </p>
+                {/* できあがったら、ブースで蔵の人に見せて押す（Issue #72）。 */}
+                <ReceiveButton request={request} breweryName={brewery?.name} />
               </Card>
             );
           })

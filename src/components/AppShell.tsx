@@ -8,6 +8,7 @@ import { useState, useTransition, type ReactNode } from 'react';
 import { NoticeBell } from '@/components/NoticeBell';
 import { ConfirmDialog } from '@/components/ui';
 import type { OrderingStatus } from '@/lib/domain';
+import { usePushResync } from '@/lib/usePushSubscription';
 import { useSnapshot } from '@/lib/useSnapshot';
 
 export interface Tab {
@@ -51,6 +52,9 @@ export function AppShell({
   children: ReactNode;
 }) {
   const pathname = usePathname();
+  // 開くたびに、お知らせの登録をサーバーと突き合わせる（Issue #76）。ヘルプを
+  // 開いたときだけにすると、ヘルプを開かない人の登録は直らない。
+  usePushResync();
 
   return (
     <div className="washi flex min-h-dvh justify-center bg-sumi">

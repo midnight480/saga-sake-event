@@ -137,6 +137,21 @@ export interface OrderRequest {
   status: RequestStatus;
   createdAt: string; // ISO
   updatedAt: string; // ISO
+  /** 蔵が最後に催促した時刻（Issue #73）。していなければ null。 */
+  remindedAt: string | null;
+}
+
+/**
+ * 催促を送れる間隔（秒。Issue #73）。蔵が続けて押しても、参加者のスマホを鳴らし続けないため。
+ * サーバー（store.ts の markReminded）と蔵の画面の両方でこの値を使う。
+ */
+export const REMIND_INTERVAL_SECONDS = 60;
+
+/** いま催促を送れるか。前の催促から REMIND_INTERVAL_SECONDS 経っていれば送れる。 */
+export function canRemind(request: OrderRequest, now: Date): boolean {
+  if (request.status !== 'ready') return false;
+  if (!request.remindedAt) return true;
+  return now.getTime() - new Date(request.remindedAt).getTime() >= REMIND_INTERVAL_SECONDS * 1000;
 }
 
 // ─────────────────────────────────────────────────────────────

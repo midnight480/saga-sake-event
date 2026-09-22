@@ -34,6 +34,25 @@ export default function GuestHelpPage() {
         </HelpNote>
       </HelpSection>
 
+      <HelpSection title="QR コードの読み取りかた">
+        <HelpSteps
+          items={[
+            <>
+              スマートフォンの<strong className="text-ink">カメラ</strong>を開きます（写真を撮るときと同じアプリです）。
+            </>,
+            <>QR コードに向けて、枠の中に入るように少し待ちます。</>,
+            <>
+              画面に出てきた<strong className="text-ink">案内（リンク）を押します</strong>。
+              この画面が開きます。
+            </>,
+          ]}
+        />
+        <HelpNote>
+          この画面の中で券を読むときは、上のメニューの「チケット」を押してください。
+          いちばん上に読み取り枠が出るので、「カメラでQRを読み取る」を押して券をかざします。
+        </HelpNote>
+      </HelpSection>
+
       <HelpSection title="お酒の頼み方">
         <HelpSteps
           items={[
@@ -57,6 +76,11 @@ export default function GuestHelpPage() {
               「ブースで受け取ってください」と出たら、その蔵まで取りに行ってください。
               できあがると、音と振動が鳴り、画面の下に帯が出ます（🔔 にも残ります）。
               音と振動は、マイページの「できあがりの知らせ方」で切り替えられます。
+            </>,
+            <>
+              ブースでお酒を受け取ったら、蔵の人に画面を見せて
+              <strong className="text-ink">「受け取りました」</strong>を押してください
+              （蔵の人が押してくれることもあります）。
             </>,
             <>
               受け取ると、<strong className="text-ink">記録</strong>の画面に移ります。

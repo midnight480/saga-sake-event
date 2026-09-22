@@ -41,6 +41,7 @@ import {
   type SentMessage,
   type Inquiry,
   type TicketBatch,
+  REMIND_INTERVAL_SECONDS,
 } from './domain';
 
 async function db() {
@@ -731,6 +732,7 @@ function toRequest(row: Record<string, unknown>): OrderRequest {
     status: row.status as RequestStatus,
     createdAt: new Date(row.created_at as string).toISOString(),
     updatedAt: new Date(row.updated_at as string).toISOString(),
+    remindedAt: row.reminded_at ? new Date(row.reminded_at as string).toISOString() : null,
   };
 }
 
@@ -740,7 +742,7 @@ export async function listRequests(): Promise<OrderRequest[]> {
   const sql = await db();
   const rows = (await sql`
     SELECT id, guest_clerk_id, guest_label, brewery_id, item_id, brand,
-           cups, ticket_cost, status, created_at, updated_at
+           cups, ticket_cost, status, created_at, updated_at, reminded_at
     FROM requests
     ORDER BY created_at DESC
     LIMIT 2000
@@ -758,7 +760,7 @@ export async function listRequestsForGuest(clerkUserId: string): Promise<OrderRe
   const sql = await db();
   const rows = (await sql`
     SELECT id, guest_clerk_id, guest_label, brewery_id, item_id, brand,
-           cups, ticket_cost, status, created_at, updated_at
+           cups, ticket_cost, status, created_at, updated_at, reminded_at
     FROM requests
     WHERE guest_clerk_id = ${clerkUserId}
     ORDER BY created_at DESC
@@ -776,7 +778,7 @@ export async function listRequestsForBrewery(breweryId: string): Promise<OrderRe
   const sql = await db();
   const rows = (await sql`
     SELECT id, guest_clerk_id, guest_label, brewery_id, item_id, brand,
-           cups, ticket_cost, status, created_at, updated_at
+           cups, ticket_cost, status, created_at, updated_at, reminded_at
     FROM requests
     WHERE brewery_id = ${breweryId}
     ORDER BY created_at DESC
@@ -923,6 +925,71 @@ export async function setRequestStatus(
     RETURNING id
   `) as { id: number }[];
   return rows.length > 0 ? ok(undefined) : fail(raced);
+}
+
+/**
+ * 参加者が自分で「受け取りました」を押す（Issue #72）。
+ *
+ * 蔵の「受渡完了」と同じく、準備完了のものだけを受渡完了に進め、進められたときだけ
+ * 在庫を減らす。条件に「本人の注文であること」を足した 1 文なので、蔵と参加者が
+ * 同時に押しても在庫は 1 回しか減らない。
+ */
+export async function confirmReceived(requestId: number, guestClerkId: string): Promise<Result> {
+  const { STATUS_LABEL } = await import('./domain');
+  const sql = await db();
+  const rows = (await sql`
+    WITH moved AS (
+      UPDATE requests SET status = 'delivered', updated_at = now()
+      WHERE id = ${requestId} AND guest_clerk_id = ${guestClerkId} AND status = 'ready'
+      RETURNING item_id, cups
+    )
+    UPDATE items
+    SET used_cups = used_cups + (SELECT cups FROM moved)
+    WHERE id = (SELECT item_id FROM moved)
+    RETURNING id
+  `) as { id: string }[];
+  if (rows.length > 0) return ok(undefined);
+
+  // 進められなかった理由を、そのまま画面に出せる言葉にする。
+  const current = (await sql`
+    SELECT status FROM requests WHERE id = ${requestId} AND guest_clerk_id = ${guestClerkId}
+  `) as { status: RequestStatus }[];
+  if (current.length === 0) return fail('その注文は見つかりませんでした。');
+  if (current[0].status === 'delivered') return fail('この注文は、すでに受け取り済みです。');
+  return fail(
+    `いまは「${STATUS_LABEL[current[0].status]}」です。できあがってから押してください。`,
+  );
+}
+
+/**
+ * 取りに来ていない参加者への催促を記録する（Issue #73）。
+ *
+ * 「準備完了のまま」「前の催促から間が空いている」を条件にした 1 文で時刻を書く。
+ * 書けたときだけ知らせを送る（actions.ts）ので、蔵の端末が 2 台同時に押しても
+ * 1 回しか届かない。
+ */
+export async function markReminded(requestId: number, breweryId?: string): Promise<Result> {
+  const sql = await db();
+  const rows = (await sql`
+    UPDATE requests SET reminded_at = now()
+    WHERE id = ${requestId}
+      AND status = 'ready'
+      AND (${breweryId ?? null}::text IS NULL OR brewery_id = ${breweryId ?? null})
+      AND (reminded_at IS NULL
+           OR reminded_at <= now() - make_interval(secs => ${REMIND_INTERVAL_SECONDS}))
+    RETURNING id
+  `) as { id: number }[];
+  if (rows.length > 0) return ok(undefined);
+
+  const current = (await sql`
+    SELECT status, brewery_id FROM requests WHERE id = ${requestId}
+  `) as { status: RequestStatus; brewery_id: string }[];
+  if (current.length === 0) return fail('その注文は見つかりませんでした。');
+  if (breweryId && current[0].brewery_id !== breweryId) {
+    return fail('ほかの蔵の注文は操作できません。');
+  }
+  if (current[0].status !== 'ready') return fail('準備完了の注文だけ催促できます。');
+  return fail('少し前に催促したばかりです。1 分ほど空けてから押してください。');
 }
 
 // ─────────────────────────────────────────────────────────────

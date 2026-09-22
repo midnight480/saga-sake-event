@@ -2,7 +2,9 @@
 
 import { useState } from 'react';
 
+import { ReceiveButton } from '@/components/ReceiveButton';
 import {
+  Card,
   Empty,
   Eyebrow,
   Note,
@@ -12,6 +14,8 @@ import {
   Title,
 } from '@/components/ui';
 import {
+  STATUS_MESSAGE,
+  UNDELIVERED_STATUSES,
   conquestOf,
   formatJstDateTime,
   requestsOf,
@@ -39,6 +43,7 @@ export default function GuestRecordPage() {
   const conquest = conquestOf(snapshot.breweries, snapshot.requests, guest.clerkUserId);
   const history = requestsOf(snapshot.requests, guest.clerkUserId);
   const nameOf = (id: string) => snapshot.breweries.find((b) => b.id === id)?.name ?? '―';
+  const waiting = history.filter((r) => UNDELIVERED_STATUSES.includes(r.status));
 
   return (
     <>
@@ -49,6 +54,38 @@ export default function GuestRecordPage() {
           <Note>受け取ったお酒だけを「制覇」として数えます。</Note>
         </div>
       </ScreenHeader>
+
+      {/*
+        ── いま待っているもの ──
+        できあがりの帯の「記録を見る」から来た人も、ここで受け取りを押せるように
+        （Issue #71, #72）。待っているものが無ければ出さない。
+      */}
+      {waiting.length > 0 && (
+        <>
+          <SectionLabel>いま待っているもの</SectionLabel>
+          <div className="flex flex-col gap-2 px-5">
+            {waiting.map((request) => (
+              <Card key={request.id}>
+                <div className="flex items-start justify-between gap-2.5">
+                  <div className="flex min-w-0 flex-col gap-1.5">
+                    <span className="font-display text-[17px] tracking-[0.04em] text-ink">
+                      {request.brand}
+                    </span>
+                    <span className="text-[11.5px] leading-none text-ink-55">
+                      {nameOf(request.breweryId)} ・ {request.cups} 杯
+                    </span>
+                  </div>
+                  <StatusBadge status={request.status} />
+                </div>
+                <p className="text-[12px] leading-[1.7] text-ink-70">
+                  {STATUS_MESSAGE[request.status]}
+                </p>
+                <ReceiveButton request={request} breweryName={nameOf(request.breweryId)} />
+              </Card>
+            ))}
+          </div>
+        </>
+      )}
 
       {/* ── 称号（Issue #52）── */}
       <TitleCard status={titleOf(conquest)} />
