@@ -3,6 +3,7 @@
 import { createContext, useContext } from 'react';
 
 import { AppShell, type LogoutOptions, type Tab } from '@/components/AppShell';
+import { ConsentModal } from '@/components/ConsentModal';
 import { NewRequestAlert } from '@/components/NewRequestAlert';
 import { orderingStatus } from '@/lib/domain';
 import { useSnapshot } from '@/lib/useSnapshot';
@@ -60,10 +61,13 @@ export function useBreweryContext(): BreweryContextValue {
 export function BreweryShell({
   breweryId,
   asOrganizer,
+  needsConsent,
   children,
 }: {
   breweryId: string;
   asOrganizer: boolean;
+  /** 利用規約・プライバシーポリシーの今の版に、まだ同意していないか（Issue #64）。 */
+  needsConsent: boolean;
   children: React.ReactNode;
 }) {
   const { snapshot, isStale } = useSnapshot();
@@ -90,6 +94,7 @@ export function BreweryShell({
         {children}
         {/* 新しいリクエストを音・振動・帯で知らせる（Issue #51）。代理で見ている主催者には鳴らさない。 */}
         {!asOrganizer && <NewRequestAlert breweryId={breweryId} />}
+        {needsConsent && <ConsentModal />}
       </AppShell>
     </BreweryContext.Provider>
   );

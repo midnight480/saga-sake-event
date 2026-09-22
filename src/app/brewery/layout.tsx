@@ -45,8 +45,23 @@ export default async function BreweryLayout({ children }: { children: React.Reac
     );
   }
 
+  // 利用規約・プライバシーポリシーへの同意（Issue #64）。酒蔵にだけ聞く。
+  // 主催者が代理で見ているときは聞かない（主催者はサービスを提供する側）。
+  let needsConsent = false;
+  if (viewer.role === 'brewery') {
+    const [{ hasConsented }, { LEGAL_VERSION }] = await Promise.all([
+      import('@/lib/store'),
+      import('@/lib/legal'),
+    ]);
+    needsConsent = !(await hasConsented(viewer.userId, LEGAL_VERSION));
+  }
+
   return (
-    <BreweryShell breweryId={breweryId} asOrganizer={viewer.role === 'organizer'}>
+    <BreweryShell
+      breweryId={breweryId}
+      asOrganizer={viewer.role === 'organizer'}
+      needsConsent={needsConsent}
+    >
       {children}
     </BreweryShell>
   );

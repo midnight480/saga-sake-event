@@ -1,4 +1,5 @@
 import { Eyebrow, ScreenHeader, Title } from '@/components/ui';
+import { LegalHelp } from '@/components/LegalHelp';
 import { HelpNote, HelpSection, HelpSteps, HelpText, HelpTroubles } from '@/components/Help';
 import { PushSettings } from '@/components/PushSettings';
 import { InquiryForm } from '@/components/InquiryForm';
@@ -157,6 +158,7 @@ export default function BreweryHelpPage() {
       </HelpSection>
 
       <InquiryForm />
+      <LegalHelp />
     </>
   );
 }

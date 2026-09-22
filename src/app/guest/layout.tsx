@@ -3,7 +3,8 @@ import { redirect } from 'next/navigation';
 
 import { getViewer, hasClerk } from '@/lib/auth';
 import { hasDatabase } from '@/lib/db';
-import { getOrCreateGuest } from '@/lib/store';
+import { LEGAL_VERSION } from '@/lib/legal';
+import { getOrCreateGuest, hasConsented } from '@/lib/store';
 
 import { GuestShell } from './shell';
 
@@ -31,8 +32,12 @@ export default async function GuestLayout({ children }: { children: React.ReactN
   if (viewer.role === 'organizer') redirect('/organizer');
   if (viewer.role === 'brewery') redirect('/brewery');
 
-  // 初回アクセスでこの人の台帳を作る。
-  await getOrCreateGuest(viewer.userId);
+  // 初回アクセスでこの人の台帳を作る。利用規約・プライバシーポリシーへの同意も
+  // 同時に確かめる（Issue #64）。どちらもデータベースへの問い合わせなので並べて投げる。
+  const [, consented] = await Promise.all([
+    getOrCreateGuest(viewer.userId),
+    hasConsented(viewer.userId, LEGAL_VERSION),
+  ]);
 
-  return <GuestShell>{children}</GuestShell>;
+  return <GuestShell needsConsent={!consented}>{children}</GuestShell>;
 }

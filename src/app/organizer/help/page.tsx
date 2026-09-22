@@ -1,4 +1,5 @@
 import { Eyebrow, ScreenHeader, Title } from '@/components/ui';
+import { LegalHelp } from '@/components/LegalHelp';
 import { HelpNote, HelpSection, HelpSteps, HelpText, HelpTroubles } from '@/components/Help';
 import { PushSettings } from '@/components/PushSettings';
 
@@ -159,6 +160,7 @@ export default function OrganizerHelpPage() {
           残っていると、受け取れていない方がいます。
         </HelpText>
       </HelpSection>
+      <LegalHelp />
     </>
   );
 }
