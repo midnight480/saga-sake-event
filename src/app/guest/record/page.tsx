@@ -11,11 +11,13 @@ import {
   StatusBadge,
   Title,
 } from '@/components/ui';
+import { ReadyNoticePrompt } from '@/components/ReadyNoticePrompt';
 import {
   conquestOf,
   formatJstDateTime,
   requestsOf,
   titleOf,
+  undeliveredRequestOf,
   type BreweryConquest,
   type TitleStatus,
 } from '@/lib/domain';
@@ -49,6 +51,12 @@ export default function GuestRecordPage() {
           <Note>受け取ったお酒だけを「制覇」として数えます。</Note>
         </div>
       </ScreenHeader>
+
+      {/*
+        受け取りを待っている間は、通知と音・振動の案内を出す。リクエストのあとは
+        ここへ移るので（Issue #62）、マイページだけに置くと見る機会が無くなる。
+      */}
+      {undeliveredRequestOf(snapshot.requests, guest.clerkUserId) && <ReadyNoticePrompt />}
 
       {/* ── 称号（Issue #52）── */}
       <TitleCard status={titleOf(conquest)} />
