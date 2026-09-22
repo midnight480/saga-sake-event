@@ -85,7 +85,8 @@ export default function BreweryHelpPage() {
         <HelpText>
           受付キューの上にある
           <strong className="text-ink">「新規リクエストを一時停止する」</strong>
-          を押してください。参加者の画面に「受付停止中」と出て、新しい注文が来なくなります。
+          を押してください。確認が出るので「はい、止めます」を押すと、参加者の画面に
+          「受付停止中」と出て、新しい注文が来なくなります。
         </HelpText>
         <HelpText>
           すでに受けている注文は残るので、落ち着いてから片付けてください。

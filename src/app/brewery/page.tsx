@@ -4,9 +4,19 @@ import { useState, useTransition } from 'react';
 
 import { setAccepting, setBrandAccepting, setRequestStatus } from '@/app/actions';
 import { AlertSettings } from '@/components/AlertSettings';
-import { Button, Card, Empty, Eyebrow, Notice, StatusBadge, Title } from '@/components/ui';
+import {
+  Button,
+  Card,
+  ConfirmDialog,
+  Empty,
+  Eyebrow,
+  Notice,
+  StatusBadge,
+  Title,
+} from '@/components/ui';
 import {
   STATUS_FLOW,
+  UNDELIVERED_STATUSES,
   itemAvailableCups,
   minutesSince,
   waitingCount,
@@ -24,6 +34,7 @@ export default function BreweryQueuePage() {
   const { snapshot, isInitialLoading, refresh } = useSnapshot();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [confirmPause, setConfirmPause] = useState(false);
 
   if (isInitialLoading || !snapshot) return <Empty>読み込んでいます…</Empty>;
 
@@ -42,14 +53,26 @@ export default function BreweryQueuePage() {
 
   const waiting = waitingCount(snapshot.waitingByBrewery, breweryId);
 
-  const toggleAccepting = () => {
+  const setBreweryAccepting = (accepting: boolean) => {
     setError(null);
+    setConfirmPause(false);
     startTransition(async () => {
-      const result = await setAccepting(!brewery.accepting, breweryId);
+      const result = await setAccepting(accepting, breweryId);
       if (!result.ok) setError(result.reason);
       await refresh();
     });
   };
+
+  // 止めるときだけ確認を挟む（Issue #56）。押しただけで止まると、触れた拍子に
+  // 注文が来なくなり、気づかないまま時間が過ぎる。再開は安全なので確認しない。
+  const toggleAccepting = () => {
+    if (brewery.accepting) setConfirmPause(true);
+    else setBreweryAccepting(true);
+  };
+
+  // 確認の文面に出す数。止めても、受けている注文はそのまま渡せることを伝える。
+  const inHand = queue.filter((r) => r.status === 'accepted' || r.status === 'preparing').length;
+  const readyNow = queue.filter((r) => r.status === 'ready').length;
 
   return (
     <>
@@ -83,7 +106,31 @@ export default function BreweryQueuePage() {
           </Notice>
         )}
 
-        {brewery.items.length > 0 && <ItemAccepting items={brewery.items} onRefresh={refresh} />}
+        <ConfirmDialog
+          open={confirmPause}
+          title="新規リクエストを一時停止しますか"
+          confirmLabel="はい、止めます"
+          onConfirm={() => setBreweryAccepting(false)}
+          onCancel={() => setConfirmPause(false)}
+          pending={pending}
+        >
+          参加者の画面に「受付停止中」と出て、この蔵には新しい注文が来なくなります。
+          <br />
+          <br />
+          <strong className="text-ink">止めても消えないもの</strong>
+          <br />
+          受けている注文 {inHand} 件（受付済・準備中）／ 準備完了 {readyNow} 件
+          <br />
+          これらはそのまま渡せます。
+          <br />
+          <br />
+          「受付を再開する」を押すまで止まったままです。止めている間は、主催者の画面で黄色く
+          表示されます。
+        </ConfirmDialog>
+
+        {brewery.items.length > 0 && (
+          <ItemAccepting items={brewery.items} requests={queue} onRefresh={refresh} />
+        )}
 
         {/* 新しいリクエストの知らせ方（Issue #51）。代理で見ている主催者には出さない。 */}
         {!asOrganizer && <AlertSettings />}
@@ -125,7 +172,15 @@ export default function BreweryQueuePage() {
  * 注文はそのまま渡せる。受付キューが主役の画面なので、一覧は開いたときだけ
  * 出す。止めている銘柄があれば、閉じていても分かるようにしておく。
  */
-function ItemAccepting({ items, onRefresh }: { items: Item[]; onRefresh: () => Promise<unknown> }) {
+function ItemAccepting({
+  items,
+  requests,
+  onRefresh,
+}: {
+  items: Item[];
+  requests: OrderRequest[];
+  onRefresh: () => Promise<unknown>;
+}) {
   const [open, setOpen] = useState(false);
   const paused = items.filter((i) => !i.accepting);
 
@@ -140,7 +195,16 @@ function ItemAccepting({ items, onRefresh }: { items: Item[]; onRefresh: () => P
       {open && (
         <div className="flex flex-col gap-1.5">
           {items.map((item) => (
-            <ItemAcceptingRow key={item.id} item={item} onRefresh={onRefresh} />
+            <ItemAcceptingRow
+              key={item.id}
+              item={item}
+              undelivered={
+                requests.filter(
+                  (r) => r.itemId === item.id && UNDELIVERED_STATUSES.includes(r.status),
+                ).length
+              }
+              onRefresh={onRefresh}
+            />
           ))}
         </div>
       )}
@@ -152,18 +216,35 @@ function ItemAccepting({ items, onRefresh }: { items: Item[]; onRefresh: () => P
   );
 }
 
-function ItemAcceptingRow({ item, onRefresh }: { item: Item; onRefresh: () => Promise<unknown> }) {
+function ItemAcceptingRow({
+  item,
+  undelivered,
+  onRefresh,
+}: {
+  item: Item;
+  /** この銘柄の、まだ渡していない注文の数。確認の文面に出す。 */
+  undelivered: number;
+  onRefresh: () => Promise<unknown>;
+}) {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [confirming, setConfirming] = useState(false);
   const soldOut = itemAvailableCups(item) === 0;
 
-  const toggle = () => {
+  const change = (accepting: boolean) => {
     setError(null);
+    setConfirming(false);
     startTransition(async () => {
-      const result = await setBrandAccepting(item.id, !item.accepting);
+      const result = await setBrandAccepting(item.id, accepting);
       if (!result.ok) setError(result.reason);
       await onRefresh();
     });
+  };
+
+  // 止めるときだけ確認する（Issue #56）。再開は安全なのですぐ行う。
+  const toggle = () => {
+    if (item.accepting) setConfirming(true);
+    else change(true);
   };
 
   return (
@@ -192,6 +273,25 @@ function ItemAcceptingRow({ item, onRefresh }: { item: Item; onRefresh: () => Pr
         </Button>
       </div>
       {error && <Notice tone="danger">{error}</Notice>}
+
+      <ConfirmDialog
+        open={confirming}
+        title={`「${item.name}」の受付を止めますか`}
+        confirmLabel="はい、止めます"
+        onConfirm={() => change(false)}
+        onCancel={() => setConfirming(false)}
+        pending={pending}
+      >
+        参加者の画面で、この銘柄が「停止中」になり、頼めなくなります。ほかの銘柄は
+        これまでどおり頼めます。
+        <br />
+        <br />
+        <strong className="text-ink">止めても消えないもの</strong>
+        <br />
+        この銘柄の、まだ渡していない注文 {undelivered} 件
+        <br />
+        これらはそのまま渡せます。「再開する」を押すまで止まったままです。
+      </ConfirmDialog>
     </div>
   );
 }
