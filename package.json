@@ -2,7 +2,7 @@
   "name": "saga-sake-event",
   "version": "1.0.0",
   "private": true,
-  "description": "佐賀 蔵めぐり — 合同試飲イベント運営 Web サービス",
+  "description": "佐嘉 蔵めぐり — 合同試飲イベント運営 Web サービス",
   "engines": {
     "node": ">=20.9.0"
   },

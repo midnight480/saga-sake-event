@@ -71,7 +71,7 @@ export default function BreweryCredentialsPrintPage() {
                   className="rounded-card border border-hairline bg-card p-5 print:mb-6 print:break-inside-avoid print:rounded-none print:border-black/30 print:bg-white print:text-black"
                 >
                   <div className="text-[10px] tracking-[0.3em] text-gold print:text-black/60">
-                    佐賀 蔵めぐり ─ ログイン案内
+                    佐嘉 蔵めぐり ─ ログイン案内
                   </div>
                   <h2 className="mt-2 font-display text-[22px] tracking-[0.04em] text-ink print:text-black">
                     {row.name}

@@ -32,19 +32,19 @@ const DESCRIPTION =
   '佐賀の酒蔵が集まる合同試飲イベントの受付・在庫・チケットを 1 つにまとめた運営アプリ';
 
 export const metadata: Metadata = {
-  title: '佐賀 蔵めぐり',
+  title: '佐嘉 蔵めぐり',
   description: DESCRIPTION,
   // 当日の案内は LINE やメールで回る。貼ったときに何のリンクか分かるようにする。
   openGraph: {
     type: 'website',
-    siteName: '佐賀 蔵めぐり',
-    title: '佐賀 蔵めぐり',
+    siteName: '佐嘉 蔵めぐり',
+    title: '佐嘉 蔵めぐり',
     description: DESCRIPTION,
     locale: 'ja_JP',
   },
   twitter: {
     card: 'summary_large_image',
-    title: '佐賀 蔵めぐり',
+    title: '佐嘉 蔵めぐり',
     description: DESCRIPTION,
   },
   // ホーム画面に追加したときの見た目。iPhone と Android のどちらでも効く。

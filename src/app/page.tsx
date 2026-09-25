@@ -31,7 +31,7 @@ export default async function Home() {
           SAGA SAKE FESTIVAL
         </div>
         <h1 className="font-display text-[38px] leading-[1.1] tracking-[0.06em] text-ink">
-          佐賀 蔵めぐり
+          佐嘉 蔵めぐり
         </h1>
         <p className="mt-4 text-[13px] leading-[1.9] text-ink-55">
           佐賀の酒蔵が集まる合同試飲イベントの受付アプリです。

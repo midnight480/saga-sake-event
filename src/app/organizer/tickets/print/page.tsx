@@ -106,7 +106,7 @@ export default async function TicketPrintPage({
                     className="flex flex-col items-center gap-1.5 rounded-card border border-hairline bg-ink p-3 text-center print:break-inside-avoid print:rounded-none print:border-black/40 print:bg-white"
                   >
                     <div className="text-[9px] tracking-[0.24em] text-black/55">
-                      佐賀 蔵めぐり ・ {batch.label}
+                      佐嘉 蔵めぐり ・ {batch.label}
                     </div>
                     {/* 印刷で 25mm 前後になる大きさ。スマホのカメラで手元から読める。 */}
                     <div

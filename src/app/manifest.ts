@@ -7,7 +7,7 @@ import type { MetadataRoute } from 'next';
  */
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: '佐賀 蔵めぐり',
+    name: '佐嘉 蔵めぐり',
     short_name: '蔵めぐり',
     description: '佐賀の酒蔵が集まる合同試飲イベントの運営アプリ',
     start_url: '/',

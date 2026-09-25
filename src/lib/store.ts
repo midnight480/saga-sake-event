@@ -68,7 +68,7 @@ export async function getEvent(): Promise<EventSettings> {
 
   const row = rows[0];
   return {
-    name: String(row?.name ?? '佐賀 蔵めぐり'),
+    name: String(row?.name ?? '佐嘉 蔵めぐり'),
     // date 型は Date で返ることがあるので 'YYYY-MM-DD' に正規化する
     eventDate: toDateString(row?.event_date),
     startTime: String(row?.start_time ?? '11:00'),
