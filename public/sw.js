@@ -15,7 +15,7 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('push', (event) => {
-  let data = { title: '佐賀 蔵めぐり', body: '', url: '/', tag: '', requireInteraction: false, vibrate: null };
+  let data = { title: '佐嘉 蔵めぐり', body: '', url: '/', tag: '', requireInteraction: false, vibrate: null };
   try {
     if (event.data) data = { ...data, ...event.data.json() };
   } catch {

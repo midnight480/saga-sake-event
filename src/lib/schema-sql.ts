@@ -21,7 +21,7 @@ export const STATEMENTS: string[] = [
   // ── イベント設定。1 行しか持たない（id は常に 1）──
   `CREATE TABLE IF NOT EXISTS events (
      id                   integer PRIMARY KEY DEFAULT 1,
-     name                 text        NOT NULL DEFAULT '佐賀 蔵めぐり',
+     name                 text        NOT NULL DEFAULT '佐嘉 蔵めぐり',
      event_date           date        NOT NULL DEFAULT CURRENT_DATE,
      start_time           text        NOT NULL DEFAULT '11:00',
      end_time             text        NOT NULL DEFAULT '16:00',
@@ -412,4 +412,10 @@ export const SEED_STATEMENTS: string[] = [
   `UPDATE ticket_batches SET label = '当日券' WHERE id = 'same-day' AND label LIKE '当日券%' AND label <> '当日券'`,
   // 前売券も会場で追加発行できるようにする（初期データの名残を解消）。
   `UPDATE ticket_batches SET can_add = true WHERE can_add = false`,
+
+  // 名称を「佐賀 蔵めぐり」から「佐嘉 蔵めぐり」に改めた分の移行（DESIGN.md §11）。
+  // 既存の表には古い既定値が入ったまま残るので、既定値のままの行だけ書き換える。
+  // 主催者が別の名前に変えていれば、それは触らない。
+  `ALTER TABLE events ALTER COLUMN name SET DEFAULT '佐嘉 蔵めぐり'`,
+  `UPDATE events SET name = '佐嘉 蔵めぐり' WHERE name = '佐賀 蔵めぐり'`,
 ];

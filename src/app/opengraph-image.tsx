@@ -6,7 +6,7 @@ import { ImageResponse } from 'next/og';
 /**
  * SNS やチャットに URL を貼ったときに出る画像。
  *
- * 当日の案内は LINE やメールで回ることが多い。そこに「佐賀 蔵めぐり」と
+ * 当日の案内は LINE やメールで回ることが多い。そこに「佐嘉 蔵めぐり」と
  * 出るだけで、何のリンクか分かって開いてもらいやすくなる。
  *
  * 画像は毎回その場で組み立てる。日本語を描くので書体が要るが、丸ごと置くと
@@ -14,7 +14,7 @@ import { ImageResponse } from 'next/og';
  * （src/assets/kaisei-subset.ttf）。外から取りに行かないので、回線が細くても
  * 生成に失敗しない。
  */
-export const alt = '佐賀 蔵めぐり ─ 合同試飲イベント運営';
+export const alt = '佐嘉 蔵めぐり ─ 合同試飲イベント運営';
 export const size = { width: 1200, height: 630 };
 export const contentType = 'image/png';
 
@@ -56,7 +56,7 @@ export default async function OpengraphImage() {
         </div>
 
         <div style={{ display: 'flex', fontSize: 132, color: INK, letterSpacing: 8 }}>
-          佐賀 蔵めぐり
+          佐嘉 蔵めぐり
         </div>
 
         <div
