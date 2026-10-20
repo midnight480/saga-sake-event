@@ -1,5 +1,7 @@
 import Link from 'next/link';
+import { notFound } from 'next/navigation';
 
+import { getViewer } from '@/lib/auth';
 import { getSetupState, type Check } from '@/lib/setup-state';
 
 export const dynamic = 'force-dynamic';
@@ -13,6 +15,13 @@ export const dynamic = 'force-dynamic';
  */
 export default async function SetupPage() {
   const { checks, ready } = await getSetupState();
+
+  // 設定が終わったあとは、この画面は環境変数の名前や診断結果という内部の
+  // 情報を見せる道具になる。設定の途中はだれでも開ける必要がある一方、
+  // 完了後に開け放しにしておくと攻撃者の足がかりになるので、運営以外には
+  // 404（そこに何も無い）として応答する。
+  if (ready && (await getViewer())?.role !== 'organizer') notFound();
+
   const doneCount = checks.filter((c) => c.status === 'ok').length;
 
   return (
