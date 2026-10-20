@@ -221,6 +221,9 @@ async function schema(): Promise<Check> {
       done: `準備できています（登録済みの酒蔵 ${rows[0]?.n ?? 0} 蔵）。`,
     };
   } catch (error) {
+    // 生のエラー文は接続先のホスト名など内部の情報を含むことがあるので、
+    // 画面には出さずサーバーのログにだけ残す。
+    console.error('[setup] データの置き場所を確かめられませんでした', error);
     return {
       id: 'schema',
       title: 'データの置き場所',
@@ -230,7 +233,7 @@ async function schema(): Promise<Check> {
         'この画面を再読み込みしてみてください',
         '何度も失敗する場合は、Vercel の Storage で Neon がこのプロジェクトに「Connected」になっているか確認してください',
       ],
-      detail: error instanceof Error ? error.message : String(error),
+      detail: '詳しい原因は Vercel の Logs タブに記録されています。',
     };
   }
 }
@@ -260,11 +263,12 @@ async function organizer(): Promise<Check> {
       link: { label: '主催者としてはじめる', href: '/sign-up' },
     };
   } catch (error) {
+    console.error('[setup] 主催者アカウントを確かめられませんでした', error);
     return {
       id: 'organizer',
       title: '主催者アカウント',
       status: 'error',
-      detail: error instanceof Error ? error.message : String(error),
+      detail: '詳しい原因は Vercel の Logs タブに記録されています。',
     };
   }
 }
